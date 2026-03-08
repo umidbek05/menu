@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Yo'naltirish uchun
 
 const regionsData = [
   { name: "Andijon", code: "60", slug: "andijon" },
@@ -23,10 +24,10 @@ function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-
+  
+  const navigate = useNavigate(); // Hookni chaqiramiz
   const dropdownRef = useRef(null);
 
-  // Tashqariga bosilganda dropdownni yopish
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -37,7 +38,6 @@ function LoginPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Qidiruv filtri
   const filteredRegions = useMemo(() => {
     if (!regionInput) return [];
     return regionsData.filter(r =>
@@ -65,18 +65,17 @@ function LoginPage() {
       return;
     }
     setError('');
-    alert(`Muvaffaqiyatli kirdingiz! Hudud: ${selectedRegion.name}`);
+    // Muvaffaqiyatli kirish: Viloyat slug'iga yo'naltirish
+    navigate(`/${selectedRegion.slug}`);
   };
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-[#0f172a] overflow-hidden p-5 font-sans text-slate-200">
-      
-      {/* Orqa fondagi effektlar */}
+      {/* Background effektlari o'zgarishsiz qoladi... */}
       <div className="absolute top-[-80px] left-[-80px] w-80 h-80 bg-indigo-600 rounded-full blur-[120px] opacity-30 animate-pulse"></div>
       <div className="absolute bottom-[-80px] right-[-80px] w-80 h-80 bg-emerald-500 rounded-full blur-[120px] opacity-30 animate-pulse delay-1000"></div>
 
       <div className="relative z-10 w-full max-w-[420px] bg-white/5 backdrop-blur-2xl rounded-[32px] p-8 border border-white/10 shadow-2xl">
-        
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-indigo-500 to-emerald-500 flex items-center justify-center font-bold text-2xl text-white shadow-xl shadow-indigo-500/30">
             SOS
@@ -86,13 +85,11 @@ function LoginPage() {
         </div>
 
         <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-          
-          {/* Hudud tanlash qismi */}
           <div className="relative" ref={dropdownRef}>
             <label className="block text-slate-400 text-xs font-bold mb-2 ml-1 uppercase tracking-widest">Hududni tanlang</label>
             <input
               type="text"
-              className="w-full px-5 py-4 rounded-2xl border border-white/10 bg-slate-900/40 text-white text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-600"
+              className="w-full px-5 py-4 rounded-2xl border border-white/10 bg-slate-900/40 text-white text-sm outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600"
               value={regionInput}
               onChange={(e) => {
                 setRegionInput(e.target.value);
@@ -101,7 +98,6 @@ function LoginPage() {
               onFocus={() => setShowDropdown(true)}
               placeholder="Hudud nomini yozing..."
             />
-
             {showDropdown && filteredRegions.length > 0 && (
               <ul className="absolute w-full max-h-60 overflow-y-auto bg-slate-900 border border-white/10 rounded-2xl mt-2 z-50 shadow-2xl">
                 {filteredRegions.map((region) => (
@@ -118,7 +114,6 @@ function LoginPage() {
             )}
           </div>
 
-          {/* Viloyat kodi (Read-only) */}
           <div>
             <label className="block text-slate-400 text-xs font-bold mb-2 ml-1 uppercase tracking-widest">Viloyat kodi</label>
             <input
@@ -129,7 +124,6 @@ function LoginPage() {
             />
           </div>
 
-          {/* Parol kiritish qismi (O'zgartirilgan placeholder) */}
           <div>
             <label className="block text-slate-400 text-xs font-bold mb-2 ml-1 uppercase tracking-widest">Maxsus parol</label>
             <div className="relative">
@@ -151,15 +145,13 @@ function LoginPage() {
             {error && <p className="mt-2 ml-1 text-red-400 text-xs font-medium animate-pulse">{error}</p>}
           </div>
 
-          {/* Kirish tugmasi */}
           <button
             type="submit"
-            className="mt-2 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed"
+            className="mt-2 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all disabled:opacity-40"
             disabled={!selectedRegion || !password}
           >
             TIZIMGA KIRISH
           </button>
-
         </form>
       </div>
     </div>
