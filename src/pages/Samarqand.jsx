@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, GeoJSON, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, Marker, Circle, useMapEvents, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Ikonkalarni sozlash
+// Marker ikonkasini sozlash
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-const redIcon = new L.Icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+const greenIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
     shadowUrl: markerShadow,
     iconSize: [25, 41],
     iconAnchor: [12, 41],
@@ -14,284 +14,440 @@ const redIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
+// Samarqand qurilmalari
 const samarqandDevices = [
-    { id: 1, name: "Registan Central-Hub", pos: [39.6542, 66.9597], address: "Samarqand sh., Registon maydoni yaqini" },
-    { id: 2, name: "Urgut Industrial-Zone", pos: [39.4042, 67.2431], address: "Urgut tumani, Erkin iqtisodiy zona" },
-    { id: 3, name: "Kattaqo'rg'on Node", pos: [39.8972, 66.2642], address: "Kattaqo'rg'on sh., Suv ombori sektori" },
-    { id: 4, name: "Bulung'ur Transit", pos: [39.7606, 67.2747], address: "Bulung'ur, M-39 Shimoliy kirish" },
-    { id: 5, name: "Pastdarg'om Relay", pos: [39.6333, 66.6833], address: "Juma sh., Markaziy aloqa tuguni" },
-    { id: 6, name: "Ishtixon Power-Unit", pos: [39.9653, 66.4864], address: "Ishtixon tumani, Energetika tarmog'i" },
-    { id: 7, name: "Jomboy Logis-Node", pos: [39.7042, 67.0867], address: "Jomboy tumani, Yuk terminali" }
+    { id: 1, name: "Registan Central-Hub", lat: 39.6542, lng: 66.9597, address: "Samarqand sh., Registon maydoni yaqini" },
+    { id: 2, name: "Urgut Industrial-Zone", lat: 39.4042, lng: 67.2431, address: "Urgut tumani, Erkin iqtisodiy zona" },
+    { id: 3, name: "Kattaqo'rg'on Node", lat: 39.8972, lng: 66.2642, address: "Kattaqo'rg'on sh., Suv ombori sektori" },
+    { id: 4, name: "Bulung'ur Transit", lat: 39.7606, lng: 67.2747, address: "Bulung'ur, M-39 Shimoliy kirish" },
+    { id: 5, name: "Pastdarg'om Relay", lat: 39.6333, lng: 66.6833, address: "Juma sh., Markaziy aloqa tuguni" },
+    { id: 6, name: "Ishtixon Power-Unit", lat: 39.9653, lng: 66.4864, address: "Ishtixon tumani, Energetika tarmog'i" },
+    { id: 7, name: "Jomboy Logis-Node", lat: 39.7042, lng: 67.0867, address: "Jomboy tumani, Yuk terminali" }
 ];
+
+// Xaritadan nuqta tanlash komponenti
+function MapPicker({ onPick }) {
+    useMapEvents({
+        click(e) {
+            onPick(e.latlng);
+        },
+    });
+    return null;
+}
 
 export default function SamarqandContact() {
     const [geoData, setGeoData] = useState(null);
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [activeSignal, setActiveSignal] = useState(samarqandDevices[Math.floor(Math.random() * samarqandDevices.length)]);
     const [isVoiceActive, setIsVoiceActive] = useState(false);
-    const [isTalking, setIsTalking] = useState(false);
+    const [showArchive, setShowArchive] = useState(false);
     
-    const isTalkingRef = useRef(false);
-    useEffect(() => { isTalkingRef.current = isTalking; }, [isTalking]);
+    // Yangi joy qo'shish uchun Modal holati
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [tempCoords, setTempCoords] = useState(null);
+    const [formData, setFormData] = useState({ name: '', sector: '', description: '' });
+
+    const [savedLocations, setSavedLocations] = useState(() => {
+        const saved = localStorage.getItem('samarqandLocations');
+        if (saved) return JSON.parse(saved);
+        
+        // Agar localStorage bo'sh bo'lsa, Samarqand qurilmalarini default qilib qo'yish
+        return samarqandDevices.map(device => ({
+            ...device,
+            sector: device.name.split(' ')[0] || "Samarqand",
+            description: device.address,
+            id: `LOC-${device.id}`,
+            recordings: []
+        }));
+    });
+
+    const [linkedNode, setLinkedNode] = useState(() => {
+        const saved = localStorage.getItem('samarqandLinkedNode');
+        return saved ? JSON.parse(saved) : null;
+    });
 
     const mapRef = useRef(null);
     const socketRef = useRef(null);
-    const audioCtxRef = useRef(null);
+    const audioContextRef = useRef(null);
+    const mediaStreamRef = useRef(null);
     const processorRef = useRef(null);
-    const sourceRef = useRef(null);
-    const streamRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
 
-    // 1. GeoJSON Yuklash
+    useEffect(() => {
+        localStorage.setItem('samarqandLocations', JSON.stringify(savedLocations));
+    }, [savedLocations]);
+
+    // Modalni ochish funksiyasi
+    const handleMapPick = (latlng) => {
+        setTempCoords(latlng);
+        setShowAddModal(true);
+    };
+
+    const handleManualAdd = () => {
+        const center = mapRef.current ? mapRef.current.getCenter() : { lat: 39.68, lng: 66.85 };
+        setTempCoords(center);
+        setShowAddModal(true);
+    };
+
+    // Yangi manzilni qidirib saqlash (geocoding bilan)
+    const saveNewLocation = async (e) => {
+        e.preventDefault();
+        if (!formData.name) return;
+
+        let finalCoords = tempCoords;
+
+        try {
+            // Nominatim API orqali kiritilgan manzil nomini koordinataga aylantirish
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.name + " Samarqand")}&limit=1`
+            );
+            const data = await response.json();
+
+            if (data && data.length > 0) {
+                // Agar manzil topilsa, yangi koordinatalarni o'rnatamiz
+                finalCoords = {
+                    lat: parseFloat(data[0].lat),
+                    lng: parseFloat(data[0].lon)
+                };
+            }
+        } catch (error) {
+            console.error("Geocoding xatosi:", error);
+            // Xato bo'lsa tempCoords (tanlangan nuqta) qolaveradi
+        }
+
+        const newLoc = {
+            ...finalCoords,
+            ...formData,
+            id: `LOC-${Date.now()}`,
+            recordings: []
+        };
+
+        setSavedLocations(prev => [...prev, newLoc]);
+        setShowAddModal(false);
+        setFormData({ name: '', sector: '', description: '' });
+        
+        // Xaritani yangi manzilga uchib borishi
+        if (mapRef.current) mapRef.current.flyTo([newLoc.lat, newLoc.lng], 16);
+    };
+
+    // Audio to'xtatish
+    const stopAudio = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        }
+        if (processorRef.current) { processorRef.current.disconnect(); processorRef.current = null; }
+        if (mediaStreamRef.current) { mediaStreamRef.current.getTracks().forEach(track => track.stop()); mediaStreamRef.current = null; }
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') { audioContextRef.current.close(); audioContextRef.current = null; }
+    };
+
+    // Audio boshlash
+    const startAudio = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaStreamRef.current = stream;
+            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const source = audioContextRef.current.createMediaStreamSource(stream);
+            processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+            
+            processorRef.current.onaudioprocess = (e) => {
+                if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    const pcmData = new Int16Array(inputData.length);
+                    for (let i = 0; i < inputData.length; i++) {
+                        pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+                    }
+                    socketRef.current.send(pcmData.buffer);
+                }
+            };
+            source.connect(processorRef.current);
+            processorRef.current.connect(audioContextRef.current.destination);
+
+            audioChunksRef.current = [];
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) audioChunksRef.current.push(event.data);
+            };
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = () => {
+                    const base64Audio = reader.result;
+                    const timestamp = new Date().toLocaleString();
+                    setSavedLocations(prev => prev.map(loc => 
+                        loc.id === linkedNode?.id 
+                        ? { ...loc, recordings: [{ id: Date.now(), data: base64Audio, time: timestamp }, ...(loc.recordings || [])] } 
+                        : loc
+                    ));
+                };
+            };
+            mediaRecorder.start();
+        } catch (err) { console.error("Mikrofon xatosi."); }
+    };
+
+    // Yozuvni o'chirish
+    const deleteRecording = (locId, recId) => {
+        if(window.confirm("Ushbu yozuvni o'chirmoqchimisiz?")) {
+            setSavedLocations(prev => prev.map(loc => 
+                loc.id === locId ? { ...loc, recordings: loc.recordings.filter(r => r.id !== recId) } : loc
+            ));
+        }
+    };
+
+    // Bog'lanishni yopish
+    const handleCloseConnection = () => {
+        stopAudio();
+        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ type: 'close', deviceId: linkedNode?.description }));
+        }
+        if (mapRef.current) mapRef.current.flyTo([39.68, 66.85], 10, { duration: 1.5 });
+        setLinkedNode(null);
+        setIsVoiceActive(false);
+        localStorage.removeItem('samarqandLinkedNode');
+    };
+
+    // Manzilni o'chirish
+    const handleDeleteLocation = (locId) => {
+        if (window.confirm("Ushbu manzil va unga tegishli barcha yozuvlar o'chib ketadi. Rozimisiz?")) {
+            setSavedLocations(prev => prev.filter(l => l.id !== locId));
+            if (linkedNode?.id === locId) handleCloseConnection();
+        }
+    };
+
+    // Bog'lanish o'rnatish
+    const handleEstablishLink = (location) => {
+        const deviceId = "DEV-SAMARQAND-" + location.id.split('-')[1];
+        const newNode = { ...location, pos: { lat: location.lat, lng: location.lng }, deviceId: deviceId };
+        setLinkedNode(newNode);
+        localStorage.setItem('samarqandLinkedNode', JSON.stringify(newNode));
+        if (mapRef.current) mapRef.current.flyTo([location.lat, location.lng], 16, { duration: 1.5 });
+    };
+
+    // Ovozni yoqish/o'chirish
+    const toggleVoice = () => {
+        if (!linkedNode) return;
+        const nextState = !isVoiceActive;
+        setIsVoiceActive(nextState);
+        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ 
+                type: nextState ? 'authorize' : 'close', 
+                deviceId: linkedNode.deviceId,
+                status: nextState ? 'start' : 'stop'
+            }));
+        }
+        if (nextState) startAudio(); else stopAudio();
+    };
+
+    // WebSocket va GeoJSON yuklash
     useEffect(() => {
         fetch('https://raw.githubusercontent.com/crebor-online/uzbekistan-geojson/master/uzbekistan.json')
             .then(res => res.json())
             .then(data => {
                 const region = data.features.find(f => 
-                    f.properties.name_uz === "Samarqand" || f.properties.name === "Samarkand"
+                    f.properties.name_uz === "Samarqand" || 
+                    f.properties.name === "Samarqand" || 
+                    f.properties.name === "Samarkand"
                 );
                 setGeoData(region);
             });
+        
+        const ws = new WebSocket(`ws://${window.location.hostname}:80`);
+        socketRef.current = ws;
+        ws.onopen = () => ws.send(JSON.stringify({ type: 'frontend' }));
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'list') setDevices(data.devices);
+            } catch (e) {}
+        };
+        
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => { clearInterval(timer); closeResources(); };
+        return () => { clearInterval(timer); if (ws) ws.close(); stopAudio(); };
     }, []);
 
-    // 2. Random Signal Skanerlash
-    useEffect(() => {
-        const signalInterval = setInterval(() => {
-            if (!isVoiceActive) {
-                const randomIndex = Math.floor(Math.random() * samarqandDevices.length);
-                setActiveSignal(samarqandDevices[randomIndex]);
-            }
-        }, 8000);
-        return () => clearInterval(signalInterval);
-    }, [isVoiceActive]);
-
-    // 3. Audio & WebSocket (Toshkent mantiqi bilan 100% bir xil)
-    const initConnection = () => {
-        const socket = new WebSocket(`ws://localhost:8000`);
-        socket.binaryType = 'arraybuffer';
-        socketRef.current = socket;
-        socket.onopen = () => console.log("✅ Samarqand Node Connected!");
-        socket.onmessage = (event) => playReceivedAudio(event.data);
-        socket.onclose = () => handleReset();
-    };
-
-    const initAudio = async () => {
-        if (audioCtxRef.current) return;
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-        audioCtxRef.current = audioCtx;
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        streamRef.current = stream;
-        const source = audioCtx.createMediaStreamSource(stream);
-        sourceRef.current = source;
-        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-        processorRef.current = processor;
-        source.connect(processor);
-        processor.connect(audioCtx.destination);
-        processor.onaudioprocess = (e) => {
-            if (socketRef.current?.readyState === WebSocket.OPEN && isTalkingRef.current) {
-                const inputData = e.inputBuffer.getChannelData(0);
-                socketRef.current.send(float32ToInt16(inputData));
-            }
-        };
-    };
-
-    const playReceivedAudio = (data) => {
-        if (!audioCtxRef.current) return;
-        const int16Array = new Int16Array(data);
-        const float32Array = new Float32Array(int16Array.length);
-        for (let i = 0; i < int16Array.length; i++) float32Array[i] = int16Array[i] / 32768;
-        const buffer = audioCtxRef.current.createBuffer(1, float32Array.length, 16000);
-        buffer.getChannelData(0).set(float32Array);
-        const source = audioCtxRef.current.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioCtxRef.current.destination);
-        source.start();
-    };
-
-    const float32ToInt16 = (buffer) => {
-        let l = buffer.length;
-        let buf = new Int16Array(l);
-        while (l--) {
-            let s = Math.max(-1, Math.min(1, buffer[l]));
-            buf[l] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        return buf.buffer;
-    };
-
-    const closeResources = () => {
-        if (socketRef.current) socketRef.current.close();
-        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-        if (processorRef.current) processorRef.current.disconnect();
-        if (sourceRef.current) sourceRef.current.disconnect();
-        if (audioCtxRef.current) audioCtxRef.current.close();
-        audioCtxRef.current = null;
-    };
-
-    const handleMicToggle = async () => {
-        if (!isTalking) await initAudio();
-        setIsTalking(!isTalking);
-    };
-
-    const handleContactClick = () => {
-        if (activeSignal && mapRef.current) {
-            mapRef.current.flyTo(activeSignal.pos, 18, { duration: 3 });
-            setIsVoiceActive(true);
-            initConnection(); 
-        }
-    };
-
-    const handleReset = () => {
-        closeResources();
-        setIsVoiceActive(false);
-        setIsTalking(false);
-        if (mapRef.current) mapRef.current.flyTo([39.68, 66.85], 9.8, { duration: 2 });
-    };
-
     return (
-        <div className="flex h-screen font-sans overflow-hidden bg-black text-white">
+        <div className="flex h-screen bg-black text-white font-sans overflow-hidden relative">
             
-            {/* 70% MAP SECTION */}
-            <div className="w-[70%] h-full flex flex-col relative z-10 border-r border-purple-500/20 shadow-[15px_0_45px_rgba(0,0,0,0.9)]">
-                <div className="p-4 bg-gray-900/90 backdrop-blur-lg flex justify-between items-center border-b border-purple-500/20">
+            {/* 1. XARITA QISMI */}
+            <div className="w-[70%] h-full flex flex-col relative border-r border-emerald-500/20">
+                <div className="p-4 bg-gray-900/90 backdrop-blur-md flex justify-between items-center border-b border-emerald-500/20 z-[1000]">
                     <div>
-                        <h1 className="text-xl font-black text-purple-400 tracking-tighter uppercase italic">Samarqand Sector SAM-08</h1>
-                        <div className="text-[10px] text-gray-500 font-mono tracking-widest uppercase flex items-center gap-2">
-                            <span className={`w-2 h-2 ${isVoiceActive ? 'bg-red-500 animate-ping' : 'bg-purple-500 animate-pulse'} rounded-full`}></span>
-                            {isVoiceActive ? "UPLINK ESTABLISHED" : "MONITORING REGIONAL NODES..."}
-                        </div>
+                        <h1 className="text-xl font-black text-emerald-400 uppercase italic tracking-tighter">Samarqand Signal Mapper</h1>
+                        <p className={`text-[9px] font-mono italic ${isVoiceActive ? 'text-red-500 animate-pulse' : 'text-gray-500'}`}>
+                            {isVoiceActive ? `● TRANSMITTING TO: ${linkedNode?.name}` : "TIZIM ONLAYN | XARITADAN TANLANG"}
+                        </p>
                     </div>
-                    <div className="text-right">
-                        <div className="text-2xl font-mono text-purple-400">{currentTime.toLocaleTimeString('uz-UZ')}</div>
-                    </div>
+                    <div className="text-2xl font-mono text-emerald-400">{currentTime.toLocaleTimeString('uz-UZ')}</div>
                 </div>
 
-                <div className="flex-grow p-4">
-                    <div className="w-full h-full relative rounded-[2.5rem] overflow-hidden border border-purple-500/30">
-                        <MapContainer 
-                            center={[39.68, 66.85]} 
-                            zoom={9.8} 
-                            zoomControl={false}
-                            style={{ height: '100%', width: '100%', background: '#000' }}
-                            ref={mapRef}
-                        >
-                            <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
-                            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png" opacity={0.5} />
-                            
-                            {geoData && (
-                                <GeoJSON 
-                                    data={geoData} 
-                                    style={{ color: '#A855F7', weight: 4, fillOpacity: 0.1, dashArray: '8, 12' }} 
-                                />
-                            )}
+                <div className="flex-grow relative">
+                    <MapContainer center={[39.68, 66.85]} zoom={10} style={{ height: '100%', background: '#050505' }} ref={mapRef} zoomControl={false}>
+                        <TileLayer 
+                            url="https://{s}.google.com/vt/lyrs=y,h&x={x}&y={y}&z={z}"
+                            subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+                            attribution='&copy; Google Maps'
+                        />
+                        {geoData && <GeoJSON data={geoData} style={{ color: '#10B981', weight: 2, fillOpacity: 0.05 }} />}
+                        
+                        <MapPicker onPick={handleMapPick} />
 
-                            {activeSignal && <Marker position={activeSignal.pos} icon={redIcon} />}
-                        </MapContainer>
-                        <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.6)]"></div>
-                    </div>
+                        {savedLocations.map(loc => (
+                            <Marker key={loc.id} position={[loc.lat, loc.lng]} icon={greenIcon}>
+                                <Tooltip direction="top" offset={[0, -40]} opacity={1} permanent className="custom-tooltip">
+                                    <div className="px-2 py-1 bg-black/60 backdrop-blur-sm border border-emerald-500/30 rounded-full">
+                                        <span className="text-[10px] font-black uppercase text-emerald-400 tracking-tighter">{loc.name}</span>
+                                    </div>
+                                </Tooltip>
+                            </Marker>
+                        ))}
+
+                        {isVoiceActive && linkedNode && (
+                            <Circle center={linkedNode.pos || [linkedNode.lat, linkedNode.lng]} radius={180} pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.3 }} />
+                        )}
+                    </MapContainer>
                 </div>
             </div>
 
-            {/* 30% CONTROL PANEL */}
-            <div className="w-[30%] h-full bg-[#0d0a14] p-6 flex flex-col border-l border-purple-500/10">
-                <h3 className="text-purple-500 text-xs font-black tracking-[0.4em] uppercase mb-8 border-b border-purple-500/20 pb-4 italic">
-                    Signal Intelligence
-                </h3>
 
-                <div className="flex-grow flex flex-col justify-start space-y-6">
-                    {activeSignal && (
-                        <div className="w-full space-y-6">
-                            <div className="bg-black/60 p-6 rounded-[2rem] border border-purple-500/20 space-y-4 relative overflow-hidden group">
-                                <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all"></div>
-                                
-                                <div>
-                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Active Station</p>
-                                    <h4 className="text-xl font-bold text-purple-400">{activeSignal.name}</h4>
-                                </div>
-                                
-                                <div className="border-t border-white/5 pt-4">
-                                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Geo Location</p>
-                                    <p className="text-xs text-white/70 font-mono mt-1 leading-relaxed">{activeSignal.address}</p>
-                                </div>
+            {/* 2. O'NG PANELDAGI QURILMALAR RO'YXATI */}
+            <div className="w-[30%] bg-[#080d0b] p-6 flex flex-col gap-6">
+                <div className="flex justify-between items-center border-b border-emerald-500/20 pb-4">
+                    <div className="flex flex-col">
+                        <h3 className="text-emerald-500 text-[10px] font-black tracking-[0.3em] uppercase italic">Samarqand Manzillar</h3>
+                        <button onClick={() => setShowArchive(true)} className="text-[8px] text-emerald-300/50 hover:text-emerald-300 uppercase font-bold mt-1 transition-colors text-left">📜 Arxivni ko'rish</button>
+                    </div>
+                    <button onClick={handleManualAdd} className="bg-emerald-500 hover:bg-emerald-400 text-black w-8 h-8 rounded-full flex items-center justify-center font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.4)]">+</button>
+                </div>
 
-                                {!isVoiceActive && (
-                                    <button 
-                                        onClick={handleContactClick}
-                                        className="w-full bg-purple-700 hover:bg-purple-600 py-4 rounded-xl font-black text-xs tracking-widest transition-all active:scale-95 shadow-[0_10px_30px_rgba(168,85,247,0.3)] uppercase text-white mt-2"
-                                    >
-                                        Establish Contact
-                                    </button>
+                <div className="flex-grow overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                    {savedLocations.length === 0 ? (
+                        <div className="text-center py-10 text-gray-600 italic text-xs">Hozircha manzillar yo'q.</div>
+                    ) : (
+                        savedLocations.map(loc => (
+                            <div key={loc.id} className={`p-5 rounded-3xl border transition-all duration-500 relative ${linkedNode?.id === loc.id ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.15)]' : 'bg-black/40 border-emerald-500/20'}`}>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc.id); }}
+                                    className="absolute top-4 right-4 text-gray-600 hover:text-red-500 transition-colors"
+                                >✕</button>
+                                <div className="mb-4 pr-6 cursor-pointer" onClick={() => mapRef.current.flyTo([loc.lat, loc.lng], 16)}>
+                                    <h4 className="font-bold text-emerald-400 text-sm uppercase truncate">{loc.name}</h4>
+                                    <p className="text-[10px] text-emerald-200/60 font-mono italic truncate">{loc.sector} | {loc.description}</p>
+                                </div>
+                                {linkedNode?.id !== loc.id ? (
+                                    <button onClick={() => handleEstablishLink(loc)} className="w-full bg-emerald-900/30 hover:bg-emerald-600 border border-emerald-500/30 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Bog'lanish</button>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => {
+                                            const nextState = !isVoiceActive;
+                                            setIsVoiceActive(nextState);
+                                            if (nextState) startAudio(); else stopAudio();
+                                        }} className={`flex-grow py-3 rounded-xl text-[10px] font-black uppercase transition-all ${isVoiceActive ? 'bg-red-600 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                                            {isVoiceActive ? 'Yozuvni To\'xtatish' : 'Ovozli Aloqa'}
+                                        </button>
+                                        <button onClick={handleCloseConnection} className="px-4 bg-red-900/20 text-red-500 rounded-xl border border-red-500/20 text-[9px] font-black uppercase">Uzish</button>
+                                    </div>
                                 )}
                             </div>
-
-                            {isVoiceActive && (
-                                <div className="flex flex-col items-center space-y-8 py-6 animate-in fade-in zoom-in duration-500">
-                                    <div className="flex flex-col items-center gap-2">
-                                        <span className={`text-[10px] font-mono tracking-[0.3em] ${isTalking ? 'text-green-400 animate-pulse' : 'text-purple-500/50'}`}>
-                                            {isTalking ? "STREAMING BINARY" : "LINK STANDBY"}
-                                        </span>
-                                    </div>
-
-                                    <button 
-                                        onClick={handleMicToggle}
-                                        className={`relative w-36 h-36 rounded-full flex items-center justify-center transition-all duration-700 border-2 ${
-                                            isTalking 
-                                            ? 'bg-green-500/10 border-green-500 shadow-[0_0_80px_rgba(34,197,94,0.4)] scale-105' 
-                                            : 'bg-black border-purple-500/40 hover:border-purple-400'
-                                        }`}
-                                    >
-                                        {isTalking && <div className="absolute inset-0 rounded-full border border-green-500 animate-ping opacity-20"></div>}
-                                        
-                                        <div className="flex flex-col items-center gap-3">
-                                            <div className="flex items-end gap-1.5 h-8">
-                                                {[...Array(6)].map((_, i) => (
-                                                    <div 
-                                                        key={i} 
-                                                        className={`w-1 bg-current rounded-full transition-all duration-300 ${
-                                                            isTalking ? 'animate-vibrate text-green-400' : 'h-2 opacity-20 text-purple-400'
-                                                        }`}
-                                                        style={{ animationDelay: `${i * 0.1}s` }}
-                                                    ></div>
-                                                ))}
-                                            </div>
-                                            <span className={`text-[10px] font-black uppercase tracking-widest ${isTalking ? 'text-green-400' : 'text-gray-500'}`}>
-                                                {isTalking ? "Active" : "Muted"}
-                                            </span>
-                                        </div>
-                                    </button>
-
-                                    <button 
-                                        onClick={handleReset}
-                                        className="group flex items-center gap-2 px-8 py-3 rounded-full border border-red-500/20 hover:border-red-500/50 transition-all"
-                                    >
-                                        <span className="text-[10px] text-red-500/70 group-hover:text-red-500 font-black uppercase tracking-widest">
-                                           Close Channel
-                                        </span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                        ))
                     )}
-                </div>
-
-                <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
-                    <p className="text-[9px] text-gray-600 font-mono tracking-tighter uppercase">SAM-LINK v2.0</p>
-                    <div className="flex gap-1">
-                        <div className="w-1 h-1 bg-purple-500 rounded-full animate-pulse"></div>
-                        <div className="w-1 h-1 bg-purple-500 rounded-full animate-pulse delay-75"></div>
-                    </div>
                 </div>
             </div>
 
-            <style>{`
-                @keyframes vibrate {
-                    0%, 100% { height: 10px; }
-                    50% { height: 28px; }
-                }
-                .animate-vibrate { animation: vibrate 0.5s ease-in-out infinite; }
-            `}</style>
 
+            {/* 3. YANGI MANZIL QO'SHISH MODALI */}
+            {showAddModal && (
+                <div className="absolute inset-0 z-[3000] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+                    <form onSubmit={saveNewLocation} className="bg-[#0c1410] border border-emerald-500/40 p-8 rounded-[32px] w-full max-w-md shadow-2xl scale-in">
+                        <h2 className="text-emerald-400 text-xl font-black uppercase italic mb-6 tracking-widest">Yangi nuqta qo'shish</h2>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Manzil nomi (Qidiriladi)</label>
+                                <input required autoFocus className="w-full bg-black/40 border border-emerald-500/20 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all" 
+                                    value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Masalan: Registon Maydoni" />
+                            </div>
+                            <div>
+                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Sektor / Qurilma</label>
+                                <input className="w-full bg-black/40 border border-emerald-500/20 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all" 
+                                    value={formData.sector} onChange={e => setFormData({...formData, sector: e.target.value})} placeholder="Sektor-A1" />
+                            </div>
+                            <div>
+                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Tavsif</label>
+                                <textarea className="w-full bg-black/40 border border-emerald-500/20 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all h-20" 
+                                    value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Qisqacha ma'lumot..." />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-8">
+                            <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-3 rounded-xl border border-emerald-500/20 text-xs font-bold uppercase hover:bg-red-500/10 hover:text-red-500 transition-all">Bekor qilish</button>
+                            <button type="submit" className="flex-1 py-3 rounded-xl bg-emerald-500 text-black text-xs font-black uppercase hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)]">Saqlash</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+
+            {/* 4. ARXIV MODAL OYNASI */}
+            {showArchive && (
+                <div className="absolute inset-0 z-[2000] bg-black/80 backdrop-blur-xl flex items-center justify-center p-10">
+                    <div className="bg-[#0c1410] border border-emerald-500/30 w-full max-w-4xl h-[80vh] rounded-[40px] flex flex-col overflow-hidden shadow-[0_0_50px_rgba(0,0,0,1)]">
+                        <div className="p-6 border-b border-emerald-500/10 flex justify-between items-center bg-emerald-500/5">
+                            <div>
+                                <h2 className="text-emerald-400 text-xl font-black uppercase italic tracking-widest">Suhbatlar Arxivi</h2>
+                                <p className="text-[10px] text-gray-500 font-mono">Barcha saqlangan audio ma'lumotlar bazasi</p>
+                            </div>
+                            <button onClick={() => setShowArchive(false)} className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white w-10 h-10 rounded-full flex items-center justify-center transition-all border border-red-500/20">✕</button>
+                        </div>
+                        <div className="flex-grow overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4 custom-scrollbar">
+                            {savedLocations.some(l => l.recordings?.length > 0) ? (
+                                savedLocations.map(loc => loc.recordings?.length > 0 && (
+                                    <div key={loc.id} className="bg-black/40 border border-emerald-500/10 p-5 rounded-[30px]">
+                                        <h3 className="text-emerald-500 font-bold text-xs uppercase mb-3 border-b border-emerald-500/5 pb-2">{loc.name}</h3>
+                                        <div className="space-y-3">
+                                            {loc.recordings.map(rec => (
+                                                <div key={rec.id} className="bg-emerald-500/5 p-3 rounded-2xl border border-emerald-500/5 group">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-[8px] text-gray-400 font-mono">{rec.time}</span>
+                                                        <button onClick={() => deleteRecording(loc.id, rec.id)} className="text-[8px] text-red-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">O'chirish</button>
+                                                    </div>
+                                                    <audio src={rec.data} controls className="w-full h-8 opacity-70 hover:opacity-100 transition-all" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="col-span-full flex flex-col items-center justify-center text-gray-600 italic py-20">
+                                    <p>Arxiv bo'sh. Hali hech qanday suhbat yozib olinmagan.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #10b981; border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: #1a2a24; }
+                .animate-pulse { animation: pulse 1s infinite; }
+                @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+                audio::-webkit-media-controls-panel { background-color: #10b981; border-radius: 10px; }
+                .scale-in { animation: scaleIn 0.2s ease-out; }
+                @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+                
+                .leaflet-tooltip.custom-tooltip {
+                    background: transparent;
+                    border: none;
+                    box-shadow: none;
+                    padding: 0;
+                }
+                .leaflet-tooltip-top:before {
+                    border-top-color: rgba(16, 185, 129, 0.4);
+                }
+            `}</style>
         </div>
     );
 }
