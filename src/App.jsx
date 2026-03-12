@@ -1,9 +1,9 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 
-// CSS importi
+// CSS va Pages
 import "./index.css";
-// Viloyatlar importi
+import LoginPage from "./loginpage/LoginPage"; // Login sahifasini import qiling
 import Andijon from "./pages/Andijon";
 import Buxoro from "./pages/Buxoro";
 import Fargona from "./pages/Fargona";
@@ -20,10 +20,10 @@ import Toshkent from "./pages/Toshkent";
 const App = () => {
   return (
     <Routes>
-      {/* Asosiy sahifaga kirganda avtomatik Toshkentga yo'naltirish */}
-      <Route path="/" element={<Navigate to="/toshkent" />} />
+      {/* Birinchi bo'lib Login sahifasi chiqadi */}
+      <Route path="/" element={<LoginPage />} />
 
-      {/* Viloyatlar yo'llari (Routes) */}
+      {/* Viloyatlar yo'llari */}
       <Route path="/andijon" element={<Andijon />} />
       <Route path="/buxoro" element={<Buxoro />} />
       <Route path="/fargona" element={<Fargona />} />
