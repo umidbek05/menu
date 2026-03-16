@@ -25,16 +25,6 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Sirdaryo qurilmalari
-const sirdaryoDevices = [
-    { id: 1, name: "Guliston Central-Hub", lat: 40.4897, lng: 68.7848, address: "Guliston sh., Sayhun ko'chasi", sector: "Guliston-001", deviceId: "ESP-GL-01" },
-    { id: 2, name: "Yangiyer Industrial-Node", lat: 40.2667, lng: 68.8333, address: "Yangiyer sh., Sanoat zonasi", sector: "Yangiyer-002", deviceId: "ESP-YG-02" },
-    { id: 3, name: "Sirdaryo Transit-Unit", lat: 40.8500, lng: 68.6667, address: "Sirdaryo tumani, M-39 trassasi", sector: "Sirdaryo-003", deviceId: "ESP-SD-03" },
-    { id: 4, name: "Shirin Power-Grid", lat: 40.2167, lng: 69.1333, address: "Shirin sh., Sirdaryo IES hududi", sector: "Shirin-004", deviceId: "ESP-SH-04" },
-    { id: 5, name: "Xovos Railway-Link", lat: 40.2000, lng: 68.6667, address: "Xovos tumani, Logistika markazi", sector: "Xovos-005", deviceId: "ESP-XV-05" },
-    { id: 6, name: "Sardoba Water-Control", lat: 40.2333, lng: 68.1667, address: "Sardoba, Gidrotexnika majmuasi", sector: "Sardoba-006", deviceId: "ESP-SR-06" },
-    { id: 7, name: "Oqoltin Agro-Node", lat: 40.4667, lng: 68.1833, address: "Oqoltin tumani, Markaziy nuqta", sector: "Oqoltin-007", deviceId: "ESP-OQ-07" }
-];
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

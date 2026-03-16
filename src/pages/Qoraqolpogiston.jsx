@@ -1250,4 +1250,4 @@ export default function QoraqalpoqContact() {
       `}</style>
     </div>
   );
-}
+};

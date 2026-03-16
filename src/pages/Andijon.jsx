@@ -25,16 +25,7 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Andijon uchun default qurilmalar
-const andijanSectors = [
-    { id: 1, name: "Andijon City-Hub", lat: 40.75, lng: 72.33, address: "Andijon sh., Bobur ko'chasi", sector: "Andijon-001", deviceId: "ESP-AND-01" },
-    { id: 2, name: "Asaka Industrial-Node", lat: 40.6333, lng: 72.2333, address: "Asaka tumani, GM zavodi", sector: "Asaka-002", deviceId: "ESP-ASA-02" },
-    { id: 3, name: "Xo'jaobod Power-Grid", lat: 40.6667, lng: 72.5667, address: "Xo'jaobod tumani, Elektr stansiyasi", sector: "Xojaobod-003", deviceId: "ESP-XOJ-03" },
-    { id: 4, name: "Shahrixon Agro-Node", lat: 40.7167, lng: 72.05, address: "Shahrixon tumani, Paxta zavodi", sector: "Shahrixon-004", deviceId: "ESP-SHA-04" },
-    { id: 5, name: "Baliqchi Desert-Relay", lat: 40.9, lng: 71.85, address: "Baliqchi tumani, Aloqa minorasi", sector: "Baliqchi-005", deviceId: "ESP-BAL-05" },
-    { id: 6, name: "Jalaquduq Water-Node", lat: 40.75, lng: 72.6167, address: "Jalaquduq tumani, Nasos stansiyasi", sector: "Jalaquduq-006", deviceId: "ESP-JAL-06" },
-    { id: 7, name: "Paxtaobod Agro-Terminal", lat: 40.9333, lng: 72.5, address: "Paxtaobod tumani, Logistika markazi", sector: "Paxtaobod-007", deviceId: "ESP-PAX-07" }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

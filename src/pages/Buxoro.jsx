@@ -25,16 +25,7 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Buxoro uchun default qurilmalar
-const bukharaNodes = [
-    { id: 1, name: "Bukhara Citadel-Hub", lat: 39.7747, lng: 64.4286, address: "Buxoro sh., Ark qo'rg'oni hududi", sector: "Buxoro-001", deviceId: "ESP-BUX-01" },
-    { id: 2, name: "Gazli Energy-Post", lat: 40.1311, lng: 63.4561, address: "Gazli shahri, Markaziy gaz terminali", sector: "Gazli-002", deviceId: "ESP-GAZ-02" },
-    { id: 3, name: "Kogon Railway-Sector", lat: 39.7167, lng: 64.5500, address: "Kogon sh., Logistika markazi", sector: "Kogon-003", deviceId: "ESP-KOG-03" },
-    { id: 4, name: "Qorako'l Border-Node", lat: 39.5000, lng: 63.8500, address: "Qorako'l, Janubiy nazorat nuqtasi", sector: "Qorakol-004", deviceId: "ESP-QOR-04" },
-    { id: 5, name: "G'ijduvon Industrial-Unit", lat: 40.1000, lng: 64.6667, address: "G'ijduvon, Hunarmandlar zonasi", sector: "Gijduvon-005", deviceId: "ESP-GIJ-05" },
-    { id: 6, name: "Qorovulbozor Refinery", lat: 39.5000, lng: 64.8167, address: "Qorovulbozor, Neftni qayta ishlash zavodi", sector: "Qorovulbozor-006", deviceId: "ESP-QBV-06" },
-    { id: 7, name: "Shofirkon Relay-Post", lat: 40.1167, lng: 64.5000, address: "Shofirkon shimoliy aloqa minorasi", sector: "Shofirkon-007", deviceId: "ESP-SHO-07" }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

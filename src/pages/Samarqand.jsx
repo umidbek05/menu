@@ -25,16 +25,7 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Samarqand uchun default qurilmalar
-const samarqandDevices = [
-    { id: 1, name: "Registan Central-Hub", lat: 39.6542, lng: 66.9597, address: "Samarqand sh., Registon maydoni yaqini", sector: "Registon-001", deviceId: "ESP-REG-01" },
-    { id: 2, name: "Urgut Industrial-Zone", lat: 39.4042, lng: 67.2431, address: "Urgut tumani, Erkin iqtisodiy zona", sector: "Urgut-002", deviceId: "ESP-URG-02" },
-    { id: 3, name: "Kattaqo'rg'on Node", lat: 39.8972, lng: 66.2642, address: "Kattaqo'rg'on sh., Suv ombori sektori", sector: "Kattaqorgan-003", deviceId: "ESP-KAT-03" },
-    { id: 4, name: "Bulung'ur Transit", lat: 39.7606, lng: 67.2747, address: "Bulung'ur, M-39 Shimoliy kirish", sector: "Bulungur-004", deviceId: "ESP-BUL-04" },
-    { id: 5, name: "Pastdarg'om Relay", lat: 39.6333, lng: 66.6833, address: "Juma sh., Markaziy aloqa tuguni", sector: "Pastdargom-005", deviceId: "ESP-PAS-05" },
-    { id: 6, name: "Ishtixon Power-Unit", lat: 39.9653, lng: 66.4864, address: "Ishtixon tumani, Energetika tarmog'i", sector: "Ishtixon-006", deviceId: "ESP-ISH-06" },
-    { id: 7, name: "Jomboy Logis-Node", lat: 39.7042, lng: 67.0867, address: "Jomboy tumani, Yuk terminali", sector: "Jomboy-007", deviceId: "ESP-JOM-07" }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

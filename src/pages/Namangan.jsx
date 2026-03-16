@@ -25,16 +25,7 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Namangan uchun default qurilmalar
-const namanganSectors = [
-    { id: 1, name: "Namangan City-Hub", lat: 40.9983, lng: 71.6726, address: "Namangan sh., Markaziy ko'cha", sector: "Namangan-001", deviceId: "ESP-NM-01" },
-    { id: 2, name: "Chust Market-Node", lat: 41.0031, lng: 71.2375, address: "Chust tumani, Bozor hududi", sector: "Chust-002", deviceId: "ESP-CH-02" },
-    { id: 3, name: "Kosonsoy Power-Grid", lat: 41.2494, lng: 71.5486, address: "Kosonsoy tumani, Elektr stansiyasi", sector: "Kosonsoy-003", deviceId: "ESP-KS-03" },
-    { id: 4, name: "Pop Agro-Node", lat: 40.8744, lng: 71.1083, address: "Pop tumani, Paxta zavodi", sector: "Pop-004", deviceId: "ESP-PP-04" },
-    { id: 5, name: "Uychi Desert-Relay", lat: 41.0833, lng: 71.9167, address: "Uychi tumani, Aloqa minorasi", sector: "Uychi-005", deviceId: "ESP-UC-05" },
-    { id: 6, name: "Mingbuloq Water-Node", lat: 40.8333, lng: 71.5833, address: "Mingbuloq tumani, Nasos stansiyasi", sector: "Mingbuloq-006", deviceId: "ESP-MB-06" },
-    { id: 7, name: "To'raqo'rg'on Industrial", lat: 40.9983, lng: 71.5167, address: "To'raqo'rg'on tumani, Sanoat zonasi", sector: "Turakurgan-007", deviceId: "ESP-TK-07" }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

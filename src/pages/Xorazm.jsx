@@ -31,72 +31,7 @@ const greenIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Xorazm uchun default qurilmalar
-const xorazmSectors = [
-  { 
-    id: 1, 
-    name: "Urganch City-Hub", 
-    lat: 41.55, 
-    lng: 60.63, 
-    address: "Urganch sh., Al-Xorazmiy ko'chasi",
-    sector: "Urganch-001",
-    deviceId: "ESP-URG-01"
-  },
-  { 
-    id: 2, 
-    name: "Xiva Ichan-Qal'a", 
-    lat: 41.3789, 
-    lng: 60.3639, 
-    address: "Xiva sh., Ichan-Qal'a muzeyi",
-    sector: "Xiva-002",
-    deviceId: "ESP-XIV-02"
-  },
-  { 
-    id: 3, 
-    name: "Qo'shko'pir Agro-Node", 
-    lat: 41.5333, 
-    lng: 60.35, 
-    address: "Qo'shko'pir tumani, Paxta zavodi",
-    sector: "Qoshkopir-003",
-    deviceId: "ESP-QOS-03"
-  },
-  { 
-    id: 4, 
-    name: "Bog'ot Power-Grid", 
-    lat: 41.35, 
-    lng: 60.8167, 
-    address: "Bog'ot tumani, Elektr stansiyasi",
-    sector: "Bogot-004",
-    deviceId: "ESP-BOG-04"
-  },
-  { 
-    id: 5, 
-    name: "Xonqa Desert-Relay", 
-    lat: 41.4667, 
-    lng: 60.7833, 
-    address: "Xonqa tumani, Aloqa minorasi",
-    sector: "Xonqa-005",
-    deviceId: "ESP-XON-05"
-  },
-  { 
-    id: 6, 
-    name: "Hazorasp Water-Node", 
-    lat: 41.3167, 
-    lng: 61.0667, 
-    address: "Hazorasp tumani, Nasos stansiyasi",
-    sector: "Hazorasp-006",
-    deviceId: "ESP-HAZ-06"
-  },
-  { 
-    id: 7, 
-    name: "Shovot Agro-Terminal", 
-    lat: 41.65, 
-    lng: 60.9833, 
-    address: "Shovot tumani, Logistika markazi",
-    sector: "Shovot-007",
-    deviceId: "ESP-SHO-07"
-  }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

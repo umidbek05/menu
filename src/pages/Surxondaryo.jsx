@@ -25,17 +25,6 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Surxondaryo uchun default qurilmalar
-const surxondaryoDevices = [
-    { id: 1, name: "Termiz Border-Hub", lat: 37.2242, lng: 67.2783, address: "Termiz sh., Janubiy chegara zonasi", sector: "Termiz-001", deviceId: "ESP-TER-01" },
-    { id: 2, name: "Denov Trade-Terminal", lat: 38.2667, lng: 67.8944, address: "Denov tumani, Markaziy savdo tuguni", sector: "Denov-002", deviceId: "ESP-DEN-02" },
-    { id: 3, name: "Jarqo'rg'an Power-Node", lat: 37.5167, lng: 67.4167, address: "Jarqo'rg'an tumani, Elektr stansiyasi", sector: "Jarqorgan-003", deviceId: "ESP-JAR-03" },
-    { id: 4, name: "Sho'rchi Agro-Sector", lat: 38.0167, lng: 67.8000, address: "Sho'rchi tumani, Paxta zavodi", sector: "Shorchi-004", deviceId: "ESP-SHO-04" },
-    { id: 5, name: "Boysun Mountain-Relay", lat: 38.2000, lng: 67.2000, address: "Boysun tumani, Aloqa minorasi", sector: "Boysun-005", deviceId: "ESP-BOY-05" },
-    { id: 6, name: "Qumqo'rg'on Water-Node", lat: 37.8333, lng: 67.6000, address: "Qumqo'rg'on tumani, Nasos stansiyasi", sector: "Qumqorgan-006", deviceId: "ESP-QUM-06" },
-    { id: 7, name: "Angor Industrial-Unit", lat: 37.4667, lng: 67.1500, address: "Angor tumani, Sanoat zonasi", sector: "Angor-007", deviceId: "ESP-ANG-07" }
-];
-
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {
     try {

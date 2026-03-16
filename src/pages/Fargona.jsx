@@ -25,16 +25,7 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Farg'ona uchun default qurilmalar
-const ferganaNerves = [
-    { id: 1, name: "Fergana Central-Hub", lat: 40.3864, lng: 71.7864, address: "Farg'ona sh., Al-Farg'oniy ko'chasi", sector: "Farg'ona-001", deviceId: "ESP-FG-01" },
-    { id: 2, name: "Kokand Trade-Node", lat: 40.5286, lng: 70.9425, address: "Qo'qon sh., Buyuk Ipak Yo'li", sector: "Qo'qon-002", deviceId: "ESP-QQ-02" },
-    { id: 3, name: "Margilan Silk-Sector", lat: 40.4714, lng: 71.7250, address: "Marg'ilon sh., Mustaqillik maydoni", sector: "Marg'ilon-003", deviceId: "ESP-MR-03" },
-    { id: 4, name: "Quvasoy Industrial-Unit", lat: 40.3056, lng: 71.9778, address: "Quvasoy sh., Sanoat zonasi", sector: "Quvasoy-004", deviceId: "ESP-QV-04" },
-    { id: 5, name: "Rishton Ceramic-Node", lat: 40.3556, lng: 71.2833, address: "Rishton tumani, Markaziy korpus", sector: "Rishton-005", deviceId: "ESP-RS-05" },
-    { id: 6, name: "Oltiariq Logistics-Post", lat: 40.3833, lng: 71.4833, address: "Oltiariq tumani, Eksport terminali", sector: "Oltiariq-006", deviceId: "ESP-OL-06" },
-    { id: 7, name: "Quva Agro-Relay", lat: 40.5167, lng: 72.0167, address: "Quva tumani, Shimoliy sektor", sector: "Quva-007", deviceId: "ESP-QV-07" }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

@@ -25,16 +25,6 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Qashqadaryo uchun default qurilmalar
-const qashqaDevices = [
-    { id: 1, name: "Qarshi Central-Node", lat: 38.8612, lng: 65.7847, address: "Qarshi sh., Mustaqillik shoh ko'chasi", sector: "Qarshi-001", deviceId: "ESP-QR-01" },
-    { id: 2, name: "Muborak Gas-Sector", lat: 39.2556, lng: 65.1528, address: "Muborak tumani, Sanoat zonasi A-5", sector: "Muborak-002", deviceId: "ESP-MB-02" },
-    { id: 3, name: "Shahrisabz Tourist-Hub", lat: 39.0583, lng: 66.8333, address: "Shahrisabz sh., Oqsaroy majmuasi", sector: "Shahrisabz-003", deviceId: "ESP-SH-03" },
-    { id: 4, name: "Sho'rtan Chemical-Unit", lat: 38.6214, lng: 66.2481, address: "G'uzor tumani, Sho'rtan gaz-kimyo", sector: "Sho'rtan-004", deviceId: "ESP-ST-04" },
-    { id: 5, name: "Kitob Astro-Node", lat: 39.1167, lng: 66.8833, address: "Kitob tumani, Balandlik stansiyasi", sector: "Kitob-005", deviceId: "ESP-KT-05" },
-    { id: 6, name: "Koson Relay-Station", lat: 39.0333, lng: 65.4500, address: "Koson tumani, Shimoliy magistral", sector: "Koson-006", deviceId: "ESP-KS-06" },
-    { id: 7, name: "Dehqonobod Salt-Mine", lat: 38.3500, lng: 66.4500, address: "Dehqonobod, Janubiy sanoat tuguni", sector: "Dehqonobod-007", deviceId: "ESP-DQ-07" }
-];
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

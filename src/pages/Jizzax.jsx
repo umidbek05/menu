@@ -25,16 +25,7 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Jizzax uchun default qurilmalar
-const jizzaxSectors = [
-    { id: 1, name: "Jizzax Central-Node", lat: 40.1158, lng: 67.8422, address: "Jizzax sh., Sh.Rashidov shoh ko'chasi", sector: "Jizzax-001", deviceId: "ESP-JIZ-01" },
-    { id: 2, name: "Zomin Alpine-Post", lat: 39.9606, lng: 68.3958, address: "Zomin tumani, Milliy bog' hududi", sector: "Zomin-002", deviceId: "ESP-ZOM-02" },
-    { id: 3, name: "Forish Desert-Unit", lat: 40.5667, lng: 67.1167, address: "Forish tumani, Aydarkul sektori", sector: "Forish-003", deviceId: "ESP-FOR-03" },
-    { id: 4, name: "G'allaorol Transit-Hub", lat: 40.0267, lng: 67.5856, address: "G'allaorol, M-39 xalqaro trassasi", sector: "Gallaorol-004", deviceId: "ESP-GAL-04" },
-    { id: 5, name: "Paxtakor Agro-Sector", lat: 40.3167, lng: 67.9500, address: "Paxtakor tumani, Markaziy stansiya", sector: "Paxtakor-005", deviceId: "ESP-PAX-05" },
-    { id: 6, name: "Do'stlik Relay-Post", lat: 40.5250, lng: 68.0333, address: "Do'stlik tumani, Shimoliy aloqa nuqtasi", sector: "Dustlik-006", deviceId: "ESP-DUS-06" },
-    { id: 7, name: "Baxmal Mountain-Link", lat: 39.8167, lng: 67.9000, address: "Baxmal, Janubiy tizmalar", sector: "Baxmal-007", deviceId: "ESP-BAX-07" }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

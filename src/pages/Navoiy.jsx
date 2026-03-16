@@ -25,16 +25,7 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Navoiy uchun default qurilmalar
-const navoiySectors = [
-    { id: 1, name: "Navoiy Mining-Hub", lat: 40.1039, lng: 65.3739, address: "Navoiy sh., NKMK Bosh boshqarmasi" },
-    { id: 2, name: "Zarafshon Gold-Node", lat: 41.5714, lng: 64.2128, address: "Zarafshon sh., 2-Gidrometallurgiya zavodi" },
-    { id: 3, name: "Uchquduq Uranium-Unit", lat: 42.1556, lng: 63.5539, address: "Uchquduq sh., Shimoliy kon boshqarmasi" },
-    { id: 4, name: "Karmana Power-Grid", lat: 40.1333, lng: 65.3667, address: "Karmana tumani, Navoiy IES hududi" },
-    { id: 5, name: "Nurota Quartz-Sector", lat: 40.5667, lng: 65.6833, address: "Nurota tumani, Marmar konlari" },
-    { id: 6, name: "Qiziltepa Agro-Node", lat: 40.0333, lng: 64.8500, address: "Qiziltepa tumani, Logistika markazi" },
-    { id: 7, name: "Konimex Desert-Relay", lat: 40.2833, lng: 65.0833, address: "Konimex tumani, Magistral aloqa nuqtasi" }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {

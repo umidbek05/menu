@@ -25,16 +25,6 @@ const yellowIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Toshkent uchun default qurilmalar
-const toshkentDevices = [
-    { id: 1, name: "Chirchiq Terminal-04", lat: 41.4689, lng: 69.5822, address: "Chirchiq sh., Sanoat zonasi", sector: "Chirchiq-001", deviceId: "ESP-CH-01" },
-    { id: 2, name: "Angren Energy-Hub", lat: 41.0167, lng: 70.1433, address: "Angren sh., IES hududi", sector: "Angren-002", deviceId: "ESP-AN-02" },
-    { id: 3, name: "Olmaliq Mining-Node", lat: 40.8500, lng: 69.6000, address: "Olmaliq sh., Kon-metallurgiya", sector: "Olmaliq-003", deviceId: "ESP-OL-03" },
-    { id: 4, name: "Bekobod Steel-Unit", lat: 40.2167, lng: 69.2167, address: "Bekobod sh., Metallurgiya zavodi", sector: "Bekobod-004", deviceId: "ESP-BK-04" },
-    { id: 5, name: "Ohangaron Cement-Plant", lat: 40.9000, lng: 69.6333, address: "Ohangaron tumani, Sement zavodi", sector: "Ohangaron-005", deviceId: "ESP-OH-05" },
-    { id: 6, name: "Parkent Solar-Farm", lat: 41.2833, lng: 69.6833, address: "Parkent tumani, Quyosh stansiyasi", sector: "Parkent-006", deviceId: "ESP-PK-06" },
-    { id: 7, name: "Bo'stonliq Agro-Node", lat: 41.3833, lng: 69.9833, address: "Bo'stonliq tumani, Agro-sektor", sector: "Bostanliq-007", deviceId: "ESP-BS-07" }
-];
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {
