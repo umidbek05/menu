@@ -12,6 +12,7 @@ import Xorazm from "./pages/Xorazm";
 import Namangan from "./pages/Namangan";
 import Navoiy from "./pages/Navoiy";
 import Qashqadaryo from "./pages/Qashqadaryo";
+import Qoraqalpogiston from "./pages/Qoraqolpogiston";
 import Samarqand from "./pages/Samarqand";
 import Sirdaryo from "./pages/Sirdaryo";
 import Surxondaryo from "./pages/Surxondaryo";
@@ -32,6 +33,7 @@ const App = () => {
       <Route path="/namangan" element={<Namangan />} />
       <Route path="/navoiy" element={<Navoiy />} />
       <Route path="/qashqadaryo" element={<Qashqadaryo />} />
+      <Route path="/qoraqalpogiston" element={<Qoraqalpogiston />} />
       <Route path="/samarqand" element={<Samarqand />} />
       <Route path="/sirdaryo" element={<Sirdaryo />} />
       <Route path="/surxondaryo" element={<Surxondaryo />} />

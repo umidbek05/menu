@@ -2,11 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker, Circle, useMapEvents, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { X, Search, Map, Archive, Trash2, Mic, MicOff } from 'lucide-react';
 
 // Marker ikonkasini sozlash
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 const greenIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+    shadowUrl: markerShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
+// Sariq marker uchun custom icon (qidiruv natijasi uchun)
+const yellowIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png',
     shadowUrl: markerShadow,
     iconSize: [25, 41],
     iconAnchor: [12, 41],
@@ -25,6 +36,80 @@ const navoiySectors = [
     { id: 7, name: "Konimex Desert-Relay", lat: 40.2833, lng: 65.0833, address: "Konimex tumani, Magistral aloqa nuqtasi" }
 ];
 
+// Google Maps havolasidan koordinatalarni ajratish funksiyasi
+async function extractCoordinatesFromGoogleMapsUrl(url) {
+    try {
+        console.log("Google Maps havolasi tahlil qilinmoqda:", url);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(url, { 
+            method: 'GET',
+            redirect: 'follow',
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const finalUrl = response.url || url;
+        console.log("Yakuniy URL:", finalUrl);
+
+        // Format 1: @41.311081,69.240562,15z
+        const atRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const atMatch = finalUrl.match(atRegex);
+        
+        if (atMatch) {
+            return {
+                lat: parseFloat(atMatch[1]),
+                lng: parseFloat(atMatch[2])
+            };
+        }
+        
+        // Format 2: !3d41.311081!4d69.240562
+        const latMatch = finalUrl.match(/!3d(-?\d+\.\d+)/);
+        const lngMatch = finalUrl.match(/!4d(-?\d+\.\d+)/);
+        
+        if (latMatch && lngMatch) {
+            return {
+                lat: parseFloat(latMatch[1]),
+                lng: parseFloat(lngMatch[2])
+            };
+        }
+        
+        // Format 3: /place/.../@41.311081,69.240562
+        const placeRegex = /\/place\/.*?@(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const placeMatch = finalUrl.match(placeRegex);
+        
+        if (placeMatch) {
+            return {
+                lat: parseFloat(placeMatch[1]),
+                lng: parseFloat(placeMatch[2])
+            };
+        }
+        
+        // Format 4: q=41.311081,69.240562
+        const queryRegex = /[?&]q=(-?\d+\.\d+)%2C(-?\d+\.\d+)/;
+        const queryMatch = finalUrl.match(queryRegex);
+        
+        if (queryMatch) {
+            return {
+                lat: parseFloat(queryMatch[1]),
+                lng: parseFloat(queryMatch[2])
+            };
+        }
+        
+        return null;
+        
+    } catch (error) {
+        console.error("Koordinatalarni ajratishda xato:", error);
+        return null;
+    }
+}
+
 // Xaritadan nuqta tanlash komponenti
 function MapPicker({ onPick }) {
     useMapEvents({
@@ -40,23 +125,30 @@ export default function NavoiyContact() {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isVoiceActive, setIsVoiceActive] = useState(false);
     const [showArchive, setShowArchive] = useState(false);
-    const [espDevices, setEspDevices] = useState([]); // ✅ QO'SHILDI
+    const [espDevices, setEspDevices] = useState([]);
     
     // Yangi joy qo'shish uchun Modal holati
     const [showAddModal, setShowAddModal] = useState(false);
     const [tempCoords, setTempCoords] = useState(null);
-    const [formData, setFormData] = useState({ name: '', sector: '', description: '' });
-    const [editingId, setEditingId] = useState(null); // ✅ QO'SHILDI
+    const [formData, setFormData] = useState({ name: '', sector: '', deviceId: '' });
+    const [editingId, setEditingId] = useState(null);
+    const [deviceIdError, setDeviceIdError] = useState('');
+
+    // Google Maps orqali qidirish uchun state'lar
+    const [searchLink, setSearchLink] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchResult, setSearchResult] = useState(null);
+    const [searchError, setSearchError] = useState('');
+    const [showSearchResult, setShowSearchResult] = useState(false);
 
     const [savedLocations, setSavedLocations] = useState(() => {
         const saved = localStorage.getItem('navoiyLocations');
         if (saved) return JSON.parse(saved);
         
-        // Agar localStorage bo'sh bo'lsa, Navoiy qurilmalarini default qilib qo'yish
         return navoiySectors.map(device => ({
             ...device,
             sector: device.name.split(' ')[0] || "Navoiy",
-            description: device.address,
+            deviceId: `ESP-${device.id}`,
             id: `LOC-${device.id}`,
             recordings: []
         }));
@@ -74,64 +166,53 @@ export default function NavoiyContact() {
     const processorRef = useRef(null);
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
-    const audioBufferRef = useRef(null); // ✅ Ringtone audio bufferni saqlash uchun
-    const audioSourceRef = useRef(null); // ✅ Audio source ni saqlash uchun
+    const audioBufferRef = useRef(null);
+    const audioSourceRef = useRef(null);
 
-    // ✅ RINGTON OVOZI - boshqa viloyatlar bilan bir xil
+    // Qidiruv natijasi uchun marker ref
+    const searchMarkerRef = useRef(null);
+
+    // Ringtone ovozini yaratish
     const createRingtoneSound = () => {
         if (!audioContextRef.current) {
             audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
         }
         
         const ctx = audioContextRef.current;
-        const duration = 4; // 4 sekund
+        const duration = 4;
         const sampleRate = ctx.sampleRate;
         const frameCount = sampleRate * duration;
         
-        // Audio buffer yaratish
         const audioBuffer = ctx.createBuffer(1, frameCount, sampleRate);
         const channelData = audioBuffer.getChannelData(0);
         
-        // Telefon jiringlash ovozini yaratish (ikki tonli ringtone)
         for (let i = 0; i < frameCount; i++) {
-            const t = i / sampleRate; // Vaqt (sekundlarda)
-            
-            // Ringtone pattern: 0.4 sekund tovush, 0.2 sekund pauza
-            const pattern = Math.floor(t * 1.6) % 2; // 0 va 1 oralig'ida
+            const t = i / sampleRate;
+            const pattern = Math.floor(t * 1.6) % 2;
             
             let value = 0;
-            
             if (pattern === 0) {
-                // Birinchi ton (musiqiy nota) - 440Hz (A nota)
                 const freq1 = 440;
                 const note1 = Math.sin(2 * Math.PI * freq1 * t);
-                
-                // Ikkinchi ton (musiqiy nota) - 554Hz (C# nota) - harmonik
                 const freq2 = 554;
                 const note2 = Math.sin(2 * Math.PI * freq2 * t * 2) * 0.5;
-                
-                // Uchinchi ton - 880Hz (oktava)
                 const freq3 = 880;
                 const note3 = Math.sin(2 * Math.PI * freq3 * t * 1.5) * 0.3;
-                
                 value = (note1 * 0.6) + (note2 * 0.3) + (note3 * 0.2);
             } else {
-                // Pauza - juda past ovoz
-                value = Math.sin(2 * Math.PI * 100 * t) * 0.05; // Zo'rg'a eshitiladigan shovqin
+                value = Math.sin(2 * Math.PI * 100 * t) * 0.05;
             }
             
-            // Ovoz balandligini asta-sekin oshirib, keyin pasaytirish (fade in/out)
-            const fadeIn = Math.min(1, t / 0.1); // 0.1 sekund fade in
-            const fadeOut = Math.min(1, (duration - t) / 0.1); // 0.1 sekund fade out
+            const fadeIn = Math.min(1, t / 0.1);
+            const fadeOut = Math.min(1, (duration - t) / 0.1);
             const envelope = fadeIn * fadeOut;
             
-            channelData[i] = value * envelope * 0.2; // 20% balandlikda - MAYIN RINGTON
+            channelData[i] = value * envelope * 0.2;
         }
         
         return audioBuffer;
     };
 
-    // ✅ RINGTON OVOZINI IJRO ETISH
     const playRingtoneSound = () => {
         if (!audioContextRef.current) {
             audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -139,51 +220,40 @@ export default function NavoiyContact() {
         
         const ctx = audioContextRef.current;
         
-        // Audio context ni resume qilish (agar suspended bo'lsa)
         if (ctx.state === 'suspended') {
             ctx.resume();
         }
         
-        // Buffer yaratish (agar mavjud bo'lmasa)
         if (!audioBufferRef.current) {
             audioBufferRef.current = createRingtoneSound();
         }
         
-        // Avvalgi ovozni to'xtatish
         if (audioSourceRef.current) {
             try {
                 audioSourceRef.current.stop();
-            } catch (e) {
-                // Stop qilishda xatolik bo'lsa ignore qilish
-            }
+            } catch (e) {}
         }
         
-        // Yangi audio source yaratish
         audioSourceRef.current = ctx.createBufferSource();
         audioSourceRef.current.buffer = audioBufferRef.current;
-        audioSourceRef.current.loop = false; // Bir marta ijro etish
+        audioSourceRef.current.loop = false;
         audioSourceRef.current.connect(ctx.destination);
         
-        // Ovoz tugagach resourcelarni tozalash
         audioSourceRef.current.onended = () => {
             audioSourceRef.current = null;
         };
         
-        // Ovozni ijro etish
         audioSourceRef.current.start();
         
         console.log("📱 Mayin rington: YANGI QURILMA SO'ROVI KELDI - NAVOIY");
     };
 
-    // ✅ STOP ALL SOUNDS
     const stopAllSounds = () => {
         if (audioSourceRef.current) {
             try {
                 audioSourceRef.current.stop();
                 audioSourceRef.current = null;
-            } catch (e) {
-                // Stop qilishda xatolik bo'lsa ignore qilish
-            }
+            } catch (e) {}
         }
     };
 
@@ -191,7 +261,7 @@ export default function NavoiyContact() {
         localStorage.setItem('navoiyLocations', JSON.stringify(savedLocations));
     }, [savedLocations]);
 
-    // ✅ AVTOMATIK QIDIRUV DEBOUNCE
+    // Avtomatik qidiruv debounce
     useEffect(() => {
         if (
             !showAddModal ||
@@ -231,29 +301,157 @@ export default function NavoiyContact() {
         return () => clearTimeout(delayDebounceFn);
     }, [formData.name, showAddModal]);
 
-    // ✅ MARKERNI BOSGANDA TAHRIRLASH
+    // Google Maps orqali qidirish funksiyasi
+    const handleSearchByLink = async () => {
+        let address = searchLink.trim();
+        
+        if (!address) {
+            setSearchError("Iltimos, qidirish uchun manzil kiriting!");
+            return;
+        }
+        
+        setIsSearching(true);
+        setSearchError('');
+        setShowSearchResult(false);
+        
+        try {
+            let lat, lng, displayName;
+            
+            // 1. Google Maps havolasini tekshirish
+            if (address.includes('goo.gl/maps') || 
+                address.includes('maps.app.goo.gl') || 
+                address.includes('google.com/maps') ||
+                address.includes('maps.google.com')) {
+                
+                const coords = await extractCoordinatesFromGoogleMapsUrl(address);
+                
+                if (coords) {
+                    lat = coords.lat;
+                    lng = coords.lng;
+                    
+                    const reverseResponse = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+                    );
+                    const reverseData = await reverseResponse.json();
+                    displayName = reverseData.display_name || `${lat}, ${lng}`;
+                } else {
+                    setSearchError("❌ Havoladan koordinatalar topilmadi.");
+                    setIsSearching(false);
+                    return;
+                }
+            }
+            // 2. Koordinata formatini tekshirish
+            else if (address.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/)) {
+                const parts = address.split(/[,\s]+/);
+                lat = parseFloat(parts[0]);
+                lng = parseFloat(parts[1]);
+                
+                const reverseResponse = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+                );
+                const reverseData = await reverseResponse.json();
+                displayName = reverseData.display_name || `${lat}, ${lng}`;
+            }
+            // 3. Oddiy matnli qidiruv
+            else {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                        address + " Navoiy"
+                    )}&limit=5`
+                );
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    lat = parseFloat(data[0].lat);
+                    lng = parseFloat(data[0].lon);
+                    displayName = data[0].display_name;
+                } else {
+                    setSearchError(`❌ "${address}" manzili topilmadi.`);
+                    setIsSearching(false);
+                    return;
+                }
+            }
+
+            setSearchResult({ lat, lng, displayName });
+            setShowSearchResult(true);
+            
+            // Xaritada sariq marker ko'rsatish
+            if (mapRef.current) {
+                // Avvalgi qidiruv markerini o'chirish
+                if (searchMarkerRef.current) {
+                    mapRef.current.removeLayer(searchMarkerRef.current);
+                }
+                
+                // Yangi marker qo'shish
+                searchMarkerRef.current = L.marker([lat, lng], { icon: yellowIcon }).addTo(mapRef.current);
+                searchMarkerRef.current.bindPopup(`<b>Qidiruv natijasi</b><br>${displayName}`).openPopup();
+                
+                // Xaritani markazlashtirish
+                mapRef.current.flyTo([lat, lng], 14, { duration: 1.5 });
+            }
+            
+        } catch (error) {
+            console.error("❌ Qidiruvda xato:", error);
+            setSearchError("Qidiruvda xatolik yuz berdi.");
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    // Qidiruv natijasini saqlash
+    const handleSaveSearchResult = () => {
+        if (!searchResult) return;
+        
+        setEditingId(null);
+        setTempCoords({ lat: searchResult.lat, lng: searchResult.lng });
+        setFormData({
+            name: searchResult.displayName,
+            sector: '',
+            deviceId: ''
+        });
+        setShowAddModal(true);
+        setShowSearchResult(false);
+        setSearchLink('');
+    };
+
+    // Qidiruv natijasini tozalash
+    const handleClearSearch = () => {
+        setSearchResult(null);
+        setSearchLink('');
+        setSearchError('');
+        setShowSearchResult(false);
+        
+        // Qidiruv markerini o'chirish
+        if (searchMarkerRef.current && mapRef.current) {
+            mapRef.current.removeLayer(searchMarkerRef.current);
+            searchMarkerRef.current = null;
+        }
+    };
+
+    // Markerni bosganda tahrirlash
     const handleMarkerClick = (location) => {
         setEditingId(location.id);
         setTempCoords({ lat: location.lat, lng: location.lng });
         setFormData({
             name: location.name,
             sector: location.sector,
-            description: location.description
+            deviceId: location.deviceId || ''
         });
+        setDeviceIdError('');
         setShowAddModal(true);
         
-        // Xaritani marker joyiga markazlashtirish
         if (mapRef.current) {
             mapRef.current.flyTo([location.lat, location.lng], 16, { duration: 1 });
         }
     };
 
-    // ✅ YANGI NUQTA QO'SHISH
+    // Yangi nuqta qo'shish
     const handleMapPick = async (latlng) => {
         setEditingId(null);
         setTempCoords(latlng);
         setShowAddModal(true);
-        setFormData((prev) => ({ ...prev, name: "Yuklanmoqda..." }));
+        setDeviceIdError('');
+        setFormData((prev) => ({ ...prev, name: "Yuklanmoqda...", deviceId: '' }));
 
         try {
             const response = await fetch(
@@ -279,16 +477,17 @@ export default function NavoiyContact() {
         }
     };
 
-    // ✅ MANUAL QO'SHISH
+    // Manual qo'shish
     const handleManualAdd = () => {
         setEditingId(null);
         const center = mapRef.current ? mapRef.current.getCenter() : { lat: 41.1, lng: 64.6 };
         setTempCoords(center);
         setShowAddModal(true);
-        setFormData((prev) => ({ ...prev, name: "" }));
+        setDeviceIdError('');
+        setFormData((prev) => ({ ...prev, name: "", deviceId: '' }));
     };
 
-    // ✅ REAL TIME QIDIRUV
+    // Real time qidiruv
     const searchAddressRealTime = async (address) => {
         if (address.length < 4) return;
 
@@ -317,9 +516,38 @@ export default function NavoiyContact() {
         }
     };
 
-    // ✅ SAQLASH FUNKSIYASI
+    // Qurilma ID unique ekanligini tekshirish
+    const isDeviceIdUnique = (deviceId, currentLocationId = null) => {
+        if (!deviceId || deviceId.trim() === '') return true;
+        
+        return !savedLocations.some(loc => 
+            loc.deviceId && 
+            loc.deviceId === deviceId && 
+            loc.id !== currentLocationId
+        );
+    };
+
+    // Qurilma ID o'zgarganda tekshirish
+    const handleDeviceIdChange = (e) => {
+        const newValue = e.target.value;
+        
+        setFormData({ ...formData, deviceId: newValue });
+        
+        if (newValue && newValue.trim() !== '') {
+            if (!isDeviceIdUnique(newValue, editingId)) {
+                setDeviceIdError('❌ Bu qurilma ID si allaqachon boshqa qurilmaga biriktirilgan!');
+            } else {
+                setDeviceIdError('');
+            }
+        } else {
+            setDeviceIdError('');
+        }
+    };
+
+    // Saqlash funksiyasi
     const saveNewLocation = async (e) => {
         e.preventDefault();
+        
         if (!formData.name || !tempCoords) {
             alert("❌ Iltimos, manzilni to'liq kiriting yoki xaritadan nuqta tanlang!");
             return;
@@ -330,15 +558,21 @@ export default function NavoiyContact() {
             return;
         }
 
+        if (formData.deviceId && formData.deviceId.trim() !== '') {
+            if (!isDeviceIdUnique(formData.deviceId, editingId)) {
+                alert("❌ Bu qurilma ID si allaqachon boshqa qurilmaga biriktirilgan! Iltimos, boshqa ID kiriting.");
+                return;
+            }
+        }
+
         if (editingId) {
-            // Tahrirlash - mavjud manzilni yangilash
             setSavedLocations(prev => prev.map(loc => 
                 loc.id === editingId 
                     ? { 
                         ...loc, 
                         name: formData.name,
                         sector: formData.sector,
-                        description: formData.description,
+                        deviceId: formData.deviceId,
                         lat: tempCoords.lat,
                         lng: tempCoords.lng
                       } 
@@ -346,12 +580,11 @@ export default function NavoiyContact() {
             ));
             alert("✅ Manzil muvaffaqiyatli tahrirlandi!");
         } else {
-            // Yangi qo'shish
             const newLoc = {
                 id: `LOC-${Date.now()}`,
                 name: formData.name,
                 sector: formData.sector,
-                description: formData.description,
+                deviceId: formData.deviceId,
                 lat: tempCoords.lat,
                 lng: tempCoords.lng,
                 recordings: []
@@ -361,14 +594,15 @@ export default function NavoiyContact() {
             alert("✅ Yangi manzil muvaffaqiyatli qo'shildi!");
         }
         
-        // Modalni yopish va tozalash
         setShowAddModal(false);
-        setFormData({ name: '', sector: '', description: '' });
+        setFormData({ name: '', sector: '', deviceId: '' });
         setTempCoords(null);
         setEditingId(null);
+        setDeviceIdError('');
+        handleClearSearch();
     };
 
-    // ✅ STOP AUDIO
+    // Stop audio
     const stopAudio = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
@@ -380,10 +614,10 @@ export default function NavoiyContact() {
             audioContextRef.current = null; 
         }
         setIsVoiceActive(false);
-        stopAllSounds(); // ✅ Barcha ovozlarni to'xtatish
+        stopAllSounds();
     };
 
-    // ✅ START AUDIO
+    // Start audio
     const startAudio = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -430,7 +664,7 @@ export default function NavoiyContact() {
         } catch (err) { console.error("Mikrofon xatosi."); }
     };
 
-    // ✅ DELETE RECORDING
+    // Delete recording
     const deleteRecording = (locId, recId) => {
         if(window.confirm("Ushbu yozuvni o'chirmoqchimisiz?")) {
             setSavedLocations(prev => prev.map(loc => 
@@ -439,7 +673,7 @@ export default function NavoiyContact() {
         }
     };
 
-    // ✅ DELETE LOCATION
+    // Delete location
     const handleDeleteLocation = (locId) => {
         if (window.confirm("Ushbu manzil va unga tegishli barcha yozuvlar o'chib ketadi. Rozimisiz?")) {
             setSavedLocations(prev => prev.filter(l => l.id !== locId));
@@ -447,7 +681,7 @@ export default function NavoiyContact() {
         }
     };
 
-    // ✅ CLOSE CONNECTION
+    // Close connection
     const handleCloseConnection = () => {
         stopAudio();
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -459,20 +693,19 @@ export default function NavoiyContact() {
         localStorage.removeItem('navoiyLinkedNode');
     };
 
-    // ✅ AUTHORIZE
+    // Authorize
     const handleAuthorize = (deviceId) => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ type: 'authorize', deviceId: deviceId }));
         }
     };
 
-    // ✅ ESTABLISH LINK
+    // Establish link
     const handleEstablishLink = (location) => {
-        const deviceIndex = savedLocations.findIndex(l => l.id === location.id);
-        const device = espDevices[deviceIndex];
+        const device = espDevices.find(d => d.id === location.deviceId);
         
         if (!device) {
-            alert("❌ Qurilma topilmadi");
+            alert(`❌ Qurilma topilmadi. ID: ${location.deviceId || 'Noma\'lum'}`);
             return;
         }
 
@@ -512,7 +745,6 @@ export default function NavoiyContact() {
                 setGeoData(region);
             });
 
-        // ✅ WEB SOCKET
         const ws = new WebSocket(`ws://${window.location.hostname}:80`);
         ws.onopen = () => {
             ws.send(JSON.stringify({ type: 'frontend' }));
@@ -523,24 +755,21 @@ export default function NavoiyContact() {
                 const data = JSON.parse(event.data);
                 
                 if (data.type === 'list') {
-                    // Yangi qurilmalar ro'yxati kelganda
                     const oldDevices = [...espDevices];
                     setEspDevices(data.devices);
                     
-                    // ✅ YANGI PENDING STATUSLI QURILMA KELGANDA MAYIN RINGTON CHALINADI
                     if (oldDevices.length < data.devices.length) {
                         const newDevices = data.devices.filter(
                             newDev => !oldDevices.some(oldDev => oldDev.id === newDev.id)
                         );
                         
                         if (newDevices.some(dev => dev.status === 'pending')) {
-                            playRingtoneSound(); // 📱 MAYIN RINGTON
+                            playRingtoneSound();
                         }
                     }
                     
                 } else if (data.type === 'new_pending_device') {
-                    // Yangi pending qurilma kelganida
-                    playRingtoneSound(); // 📱 MAYIN RINGTON
+                    playRingtoneSound();
                     
                     if (data.device) {
                         setEspDevices(prev => [...prev, data.device]);
@@ -556,24 +785,24 @@ export default function NavoiyContact() {
             clearInterval(timer); 
             if (ws) ws.close(); 
             stopAudio();
-            stopAllSounds(); // ✅ Komponent yopilganda barcha ovozlarni to'xtatish
+            stopAllSounds();
         };
     }, []);
 
-    // ✅ QURILMA NOMINI OLISH
+    // Qurilma nomini olish
     const getDeviceName = (location) => {
         if (location.sector && location.sector.trim() !== "") {
             return location.sector;
         }
-        else if (location.description && location.description.trim() !== "") {
-            return location.description;
+        else if (location.deviceId && location.deviceId.trim() !== "") {
+            return `ID: ${location.deviceId}`;
         }
         else {
             return "Qurilma";
         }
     };
 
-    // ✅ MANZIL NOMINI OLISH
+    // Manzil nomini olish
     const getLocationName = (location) => {
         if (location.name && location.name.length > 30) {
             return location.name.substring(0, 30) + "...";
@@ -586,14 +815,97 @@ export default function NavoiyContact() {
             
             {/* 1. XARITA QISMI */}
             <div className="w-[70%] h-full flex flex-col relative border-r border-emerald-500/20">
-                <div className="p-4 bg-gray-900/90 backdrop-blur-md flex justify-between items-center border-b border-emerald-500/20 z-[1000]">
-                    <div>
-                        <h1 className="text-xl font-black text-emerald-400 uppercase italic tracking-tighter">Navoiy Signal Mapper</h1>
+                <div className="p-4 bg-gray-900/90 backdrop-blur-md border-b border-emerald-500/20 z-[1000]">
+                    {/* Navbar qismi - YANGI QIDIRUV MAYDONI BILAN */}
+                    <div className="flex items-center justify-between gap-4">
+                        <h1 className="text-xl font-black text-emerald-400 uppercase italic tracking-tighter flex items-center gap-2 whitespace-nowrap">
+                            <Map className="w-5 h-5" /> Navoiy Signal Mapper
+                        </h1>
+
+                        {/* YANGI QIDIRUV MAYDONI - XORAZMDAN OLINGAN */}
+                        <div className="flex-1 max-w-2xl">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchLink}
+                                    onChange={(e) => {
+                                        setSearchLink(e.target.value);
+                                        setSearchError('');
+                                    }}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleSearchByLink()}
+                                    placeholder="Google Maps havolasi, koordinata yoki manzil..."
+                                    className="w-full bg-black/60 border border-emerald-500/20 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-500 outline-none transition-all pr-20"
+                                />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                                    {searchLink && (
+                                        <button
+                                            onClick={() => setSearchLink('')}
+                                            className="p-1.5 text-gray-500 hover:text-red-500"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleSearchByLink}
+                                        disabled={isSearching}
+                                        className={`p-1.5 rounded-lg transition-all ${
+                                            isSearching ? 'bg-gray-600 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-500'
+                                        }`}
+                                    >
+                                        <Search size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {searchError && (
+                                <div className="mt-2 text-red-500 text-xs px-2">
+                                    {searchError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* SOAT */}
+                        <div className="text-2xl font-mono text-emerald-400 whitespace-nowrap">
+                            {currentTime.toLocaleTimeString('uz-UZ')}
+                        </div>
+                    </div>
+
+                    <div className="mt-2">
                         <p className={`text-[9px] font-mono italic ${isVoiceActive ? 'text-red-500 animate-pulse' : 'text-gray-500'}`}>
                             {isVoiceActive ? `● TRANSMITTING TO: ${linkedNode?.name}` : "TIZIM ONLAYN | XARITADAN TANLANG"}
                         </p>
                     </div>
-                    <div className="text-2xl font-mono text-emerald-400">{currentTime.toLocaleTimeString('uz-UZ')}</div>
+
+                    {/* Qidiruv xatoligi - endi yuqorida ko'rsatiladi */}
+                    
+                    {/* Qidiruv natijasi */}
+                    {showSearchResult && searchResult && (
+                        <div className="mt-3 bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl">
+                            <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                    <p className="text-yellow-500 font-bold text-sm mb-1">✓ TOPILDI:</p>
+                                    <p className="text-white text-sm mb-1">{searchResult.displayName}</p>
+                                    <p className="text-gray-400 text-xs">
+                                        {searchResult.lat.toFixed(6)}, {searchResult.lng.toFixed(6)}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={handleClearSearch}
+                                    className="text-gray-500 hover:text-red-500"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                            <div className="flex gap-2 mt-3">
+                                <button
+                                    onClick={handleSaveSearchResult}
+                                    className="flex-1 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white py-2 rounded-lg text-xs font-bold uppercase transition-all"
+                                >
+                                    Manzilni saqlash
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-grow relative">
@@ -645,24 +957,19 @@ export default function NavoiyContact() {
                 </div>
             </div>
 
-            {/* 2. O'NG PANELDAGI QURILMALAR RO'YXATI */}
-            <div className="w-[30%] bg-[#080d0b] p-6 flex flex-col gap-6">
+            {/* 2. O'NG PANEL */}
+            <div className="w-[30%] bg-[#080d0b] p-6 flex flex-col gap-6 overflow-y-auto">
                 
-                {/* ✅ ARXIV TUGMASI */}
-                <div className="flex justify-end items-center border-b border-emerald-500/20 pb-4">
-                    <div className="flex flex-col w-full">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-emerald-500 text-[10px] font-black tracking-[0.3em] uppercase italic">
-                                Saqlangan Manzillar
-                            </h3>
-                            <button 
-                                onClick={() => setShowArchive(true)} 
-                                className="bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-emerald-500/30 flex items-center gap-1"
-                            >
-                                <span>📜</span> ARXIV
-                            </button>
-                        </div>
-                    </div>
+                <div className="flex justify-between items-center border-b border-emerald-500/20 pb-4">
+                    <h3 className="text-emerald-500 text-[10px] font-black tracking-[0.3em] uppercase italic">
+                        Saqlangan Manzillar ({savedLocations.length})
+                    </h3>
+                    <button 
+                        onClick={() => setShowArchive(true)} 
+                        className="bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all border border-emerald-500/30 flex items-center gap-1"
+                    >
+                        <Archive size={14} /> ARXIV
+                    </button>
                 </div>
 
                 <div className="flex-grow overflow-y-auto space-y-4 custom-scrollbar pr-2">
@@ -671,8 +978,8 @@ export default function NavoiyContact() {
                             Hozircha manzillar yo'q. Xaritadan nuqta tanlang.
                         </div>
                     ) : (
-                        savedLocations.map((loc, index) => {
-                            const device = espDevices[index];
+                        savedLocations.map((loc) => {
+                            const device = loc.deviceId ? espDevices.find(d => d.id === loc.deviceId) : null;
                             const isLinked = linkedNode?.id === loc.id;
                             const locationName = getLocationName(loc);
                             
@@ -688,7 +995,9 @@ export default function NavoiyContact() {
                                         onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc.id); }}
                                         className="absolute top-4 right-4 text-gray-600 hover:text-red-500 transition-colors"
                                         title="O'chirish"
-                                    >✕</button>
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
                                     <div 
                                         className="mb-4 pr-6 cursor-pointer hover:bg-emerald-500/5 p-2 rounded-xl transition-all"
                                         onClick={() => handleMarkerClick(loc)}
@@ -698,8 +1007,8 @@ export default function NavoiyContact() {
                                         </h4>
                                         <p className="text-[10px] text-emerald-200/60 font-mono italic truncate">
                                             <span className="text-emerald-400">Qurilma:</span> {loc.sector || "Noma'lum"} 
-                                            {loc.description && ` | ${loc.description}`}
-                                            {device && ` | DEV: ${device.id} | Status: ${device.status}`}
+                                            {loc.deviceId && ` | ID: ${loc.deviceId}`}
+                                            {device && ` | Status: ${device.status}`}
                                         </p>
                                     </div>
                                     
@@ -725,7 +1034,7 @@ export default function NavoiyContact() {
                                                 disabled
                                                 className="w-full bg-gray-800/30 border border-gray-600/30 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed opacity-50"
                                             >
-                                                Qurilma topilmadi
+                                                {loc.deviceId ? `Qurilma topilmadi (${loc.deviceId})` : 'ID kiritilmagan'}
                                             </button>
                                         )
                                     ) : (
@@ -746,7 +1055,15 @@ export default function NavoiyContact() {
                                                         : 'bg-emerald-600 hover:bg-emerald-500'
                                                 }`}
                                             >
-                                                {isVoiceActive ? 'Yozuvni To\'xtatish' : 'Ovozli Aloqa'}
+                                                {isVoiceActive ? (
+                                                    <span className="flex items-center justify-center gap-2">
+                                                        <MicOff size={14} /> Yozuvni To'xtatish
+                                                    </span>
+                                                ) : (
+                                                    <span className="flex items-center justify-center gap-2">
+                                                        <Mic size={14} /> Ovozli Aloqa
+                                                    </span>
+                                                )}
                                             </button>
                                             <button 
                                                 onClick={handleCloseConnection}
@@ -763,7 +1080,7 @@ export default function NavoiyContact() {
                 </div>
             </div>
 
-            {/* 3. YANGI MANZIL QO'SHISH/TAHRIRLASH MODALI */}
+            {/* 3. YANGI MANZIL QO'SHISH MODALI */}
             {showAddModal && (
                 <div className="absolute inset-0 z-[3000] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
                     <form onSubmit={saveNewLocation} className="bg-[#0c1410] border border-emerald-500/40 p-8 rounded-[32px] w-full max-w-md shadow-2xl scale-in">
@@ -772,7 +1089,6 @@ export default function NavoiyContact() {
                         </h2>
                         
                         <div className="space-y-4">
-                            {/* Koordinatalar displeyi */}
                             {tempCoords && (
                                 <div className="flex gap-2 mb-2 animate-pulse">
                                     <div className="flex-1 bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-2 text-center">
@@ -786,9 +1102,8 @@ export default function NavoiyContact() {
                                 </div>
                             )}
 
-                            {/* Manzil nomi */}
                             <div>
-                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Aniq Manzil (contact panelda ko'rinadi)</label>
+                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Aniq Manzil</label>
                                 <input
                                     required
                                     autoFocus
@@ -802,9 +1117,8 @@ export default function NavoiyContact() {
                                 />
                             </div>
 
-                            {/* Sektor / Qurilma nomi */}
                             <div>
-                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Qurilma Nomi (marker tepasida ko'rinadi)</label>
+                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Qurilma Nomi</label>
                                 <input
                                     className="w-full bg-black/40 border border-emerald-500/20 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all"
                                     value={formData.sector}
@@ -814,28 +1128,41 @@ export default function NavoiyContact() {
                                 <p className="text-[7px] text-emerald-500/40 mt-1 ml-2">Bu nom xaritadagi marker tepasida chiqadi</p>
                             </div>
 
-                            {/* Tavsif */}
                             <div>
-                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Tavsif / Izoh</label>
-                                <textarea
-                                    className="w-full bg-black/40 border border-emerald-500/20 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all h-20 resize-none"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    placeholder="Qo'shimcha ma'lumotlar..."
+                                <label className="text-[9px] text-emerald-500/60 uppercase font-bold ml-2">Qurilma ID</label>
+                                <input
+                                    className={`w-full bg-black/40 border ${deviceIdError ? 'border-red-500' : 'border-emerald-500/20'} rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all`}
+                                    value={formData.deviceId}
+                                    onChange={handleDeviceIdChange}
+                                    placeholder="Masalan: ESP32-001 yoki NKMK-01"
                                 />
+                                {deviceIdError ? (
+                                    <p className="text-[8px] text-red-500 mt-1 ml-2 font-bold">{deviceIdError}</p>
+                                ) : (
+                                    <p className="text-[7px] text-emerald-500/40 mt-1 ml-2">Qurilmadan keladigan ID ni kiriting (unique bo'lishi kerak)</p>
+                                )}
                             </div>
                         </div>
 
                         <div className="flex gap-3 mt-8">
                             <button type="button" onClick={() => {
                                 setShowAddModal(false);
-                                setFormData({ name: '', sector: '', description: '' });
+                                setFormData({ name: '', sector: '', deviceId: '' });
                                 setTempCoords(null);
                                 setEditingId(null);
+                                setDeviceIdError('');
                             }} className="flex-1 py-3 rounded-xl border border-emerald-500/20 text-xs font-bold uppercase hover:bg-red-500/10 hover:text-red-500 transition-all">
                                 Bekor qilish
                             </button>
-                            <button type="submit" className="flex-1 py-3 rounded-xl bg-emerald-500 text-black text-xs font-black uppercase hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                            <button 
+                                type="submit" 
+                                disabled={!!deviceIdError}
+                                className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all ${
+                                    deviceIdError 
+                                        ? 'bg-gray-600 cursor-not-allowed opacity-50' 
+                                        : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                                }`}
+                            >
                                 {editingId ? 'Yangilash' : 'Saqlash'}
                             </button>
                         </div>
@@ -843,7 +1170,7 @@ export default function NavoiyContact() {
                 </div>
             )}
 
-            {/* 4. ARXIV MODAL OYNASI */}
+            {/* 4. ARXIV MODALI */}
             {showArchive && (
                 <div className="absolute inset-0 z-[2000] bg-black/80 backdrop-blur-xl flex items-center justify-center p-10">
                     <div className="bg-[#0c1410] border border-emerald-500/30 w-full max-w-4xl h-[80vh] rounded-[40px] flex flex-col overflow-hidden shadow-[0_0_50px_rgba(0,0,0,1)]">
@@ -852,14 +1179,19 @@ export default function NavoiyContact() {
                                 <h2 className="text-emerald-400 text-xl font-black uppercase italic tracking-widest">Suhbatlar Arxivi</h2>
                                 <p className="text-[10px] text-gray-500 font-mono">Barcha saqlangan audio ma'lumotlar bazasi</p>
                             </div>
-                            <button onClick={() => setShowArchive(false)} className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white w-10 h-10 rounded-full flex items-center justify-center transition-all border border-red-500/20">✕</button>
+                            <button onClick={() => setShowArchive(false)} className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white w-10 h-10 rounded-full flex items-center justify-center transition-all border border-red-500/20">
+                                <X size={20} />
+                            </button>
                         </div>
                         <div className="flex-grow overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4 custom-scrollbar">
                             {savedLocations.some(l => l.recordings?.length > 0) ? (
                                 savedLocations.map(loc => loc.recordings?.length > 0 && (
                                     <div key={loc.id} className="bg-black/40 border border-emerald-500/10 p-5 rounded-[30px]">
                                         <h3 className="text-emerald-500 font-bold text-xs uppercase mb-3 border-b border-emerald-500/5 pb-2">{loc.sector || loc.name}</h3>
-                                        <p className="text-[8px] text-gray-400 font-mono mb-2">{loc.sector} | {loc.description}</p>
+                                        <p className="text-[8px] text-gray-400 font-mono mb-2">
+                                            {loc.sector} 
+                                            {loc.deviceId && ` | ID: ${loc.deviceId}`}
+                                        </p>
                                         <div className="space-y-3">
                                             {loc.recordings.map(rec => (
                                                 <div key={rec.id} className="bg-emerald-500/5 p-3 rounded-2xl border border-emerald-500/5 group">

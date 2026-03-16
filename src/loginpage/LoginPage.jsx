@@ -1,20 +1,20 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Yo'naltirish uchun
+import { useNavigate } from 'react-router-dom';
 
 const regionsData = [
-  { name: "Andijon", code: "60", slug: "andijon" },
-  { name: "Buxoro", code: "80", slug: "buxoro" },
-  { name: "Farg'ona", code: "40", slug: "fargona" },
-  { name: "Jizzax", code: "25", slug: "jizzax" },
-  { name: "Xorazm", code: "90", slug: "xorazm" },
-  { name: "Namangan", code: "50", slug: "namangan" },
-  { name: "Navoiy", code: "85", slug: "navoiy" },
-  { name: "Qashqadaryo", code: "70", slug: "qashqadaryo" },
-  { name: "Samarqand", code: "30", slug: "samarqand" },
-  { name: "Sirdaryo", code: "20", slug: "sirdaryo" },
-  { name: "Surxondaryo", code: "75", slug: "surxondaryo" },
-  { name: "Toshkent", code: "10", slug: "toshkent" },
-  { name: "Qoraqalpog'iston", code: "95", slug: "qoraqalpogiston" },
+  { name: "Andijon", code: "60", slug: "andijon", password: "andijon_admin" }, // Har biriga alohida parol qo'ysa ham bo'ladi
+  { name: "Buxoro", code: "80", slug: "buxoro", password: "buxoro_admin" },
+  { name: "Farg'ona", code: "40", slug: "fargona", password: "fargona_admin" },
+  { name: "Jizzax", code: "25", slug: "jizzax", password: "jizzax_admin" },
+  { name: "Xorazm", code: "90", slug: "xorazm", password: "xorazm_admin" },
+  { name: "Namangan", code: "50", slug: "namangan", password: "namangan_admin" },
+  { name: "Navoiy", code: "85", slug: "navoiy", password: "navoiy_admin" },
+  { name: "Qashqadaryo", code: "70", slug: "qashqadaryo", password: "qashqadaryo_admin" },
+  { name: "Samarqand", code: "30", slug: "samarqand", password: "samarqand_admin" },
+  { name: "Sirdaryo", code: "20", slug: "sirdaryo", password: "sirdaryo_admin" },
+  { name: "Surxondaryo", code: "75", slug: "surxondaryo", password: "surxondaryo_admin" },
+  { name: "Toshkent", code: "10", slug: "toshkent", password: "toshkent_admin" },
+  { name: "Qoraqalpogiston", code: "95", slug: "qoraqalpogiston", password: "qoraqalpogiston_admin" },
 ];
 
 function LoginPage() {
@@ -24,8 +24,10 @@ function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   
-  const navigate = useNavigate(); // Hookni chaqiramiz
+  const navigate = useNavigate();
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -52,26 +54,51 @@ function LoginPage() {
     setError('');
   };
 
-  const validatePassword = () => {
-    if (!selectedRegion) return false;
-    const requiredPassword = `${selectedRegion.slug}_admin`;
-    return password.toLowerCase() === requiredPassword.toLowerCase();
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!validatePassword()) {
-      setError("Xato! Parol noto'g'ri kiritildi.");
+    setError('');
+    
+    if (!selectedRegion || !password) {
+      setError("Hudud va parolni kiriting!");
       return;
     }
-    setError('');
-    // Muvaffaqiyatli kirish: Viloyat slug'iga yo'naltirish
-    navigate(`/${selectedRegion.slug}`);
+
+    setLoading(true);
+
+    // Backend o'rniga oddiy tekshiruv (Simulatsiya)
+    setTimeout(() => {
+      // Masalan, hamma viloyat uchun parol "12345" bo'lsin
+      // Yoki yuqoridagi obyektdagi password bilan solishtiring:
+      if (password === "12345" || password === selectedRegion.password) {
+        setShowSuccess(true);
+        setLoading(false);
+        
+        setTimeout(() => {
+          setShowSuccess(false);
+          navigate(`/${selectedRegion.slug}`);
+        }, 1500);
+      } else {
+        setError("Parol noto'g'ri!");
+        setLoading(false);
+      }
+    }, 1000); // 1 soniya kutish effekti
   };
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-[#0f172a] overflow-hidden p-5 font-sans text-slate-200">
-      {/* Background effektlari o'zgarishsiz qoladi... */}
+      
+      {showSuccess && (
+        <div className="fixed top-5 right-5 z-[100] animate-bounce">
+          <div className="bg-emerald-500/20 backdrop-blur-xl border border-emerald-500/50 px-6 py-4 rounded-2xl shadow-2xl shadow-emerald-500/20 flex items-center gap-4">
+            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">✓</div>
+            <div>
+              <p className="text-white font-bold text-sm">Muvaffaqiyatli!</p>
+              <p className="text-emerald-300 text-xs">Tizimga kirildi, kuting...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="absolute top-[-80px] left-[-80px] w-80 h-80 bg-indigo-600 rounded-full blur-[120px] opacity-30 animate-pulse"></div>
       <div className="absolute bottom-[-80px] right-[-80px] w-80 h-80 bg-emerald-500 rounded-full blur-[120px] opacity-30 animate-pulse delay-1000"></div>
 
@@ -81,7 +108,7 @@ function LoginPage() {
             SOS
           </div>
           <h2 className="text-white text-3xl font-bold mb-2 tracking-tight">Tizimga kirish</h2>
-          <p className="text-slate-400 text-sm">Viloyatni tanlang va parolni kiriting</p>
+          <p className="text-slate-400 text-sm">Offline rejim (Parol: 12345)</p>
         </div>
 
         <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
@@ -139,7 +166,7 @@ function LoginPage() {
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-indigo-400 transition-colors text-xl"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? "×" : "●"}
+                {showPassword ? "✕" : "●"}
               </button>
             </div>
             {error && <p className="mt-2 ml-1 text-red-400 text-xs font-medium animate-pulse">{error}</p>}
@@ -148,9 +175,9 @@ function LoginPage() {
           <button
             type="submit"
             className="mt-2 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all disabled:opacity-40"
-            disabled={!selectedRegion || !password}
+            disabled={!selectedRegion || !password || loading}
           >
-            TIZIMGA KIRISH
+            {loading ? "TEKSHIRILMOQDA..." : "TIZIMGA KIRISH"}
           </button>
         </form>
       </div>

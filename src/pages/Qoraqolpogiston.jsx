@@ -31,72 +31,7 @@ const greenIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Xorazm uchun default qurilmalar
-const xorazmSectors = [
-  { 
-    id: 1, 
-    name: "Urganch City-Hub", 
-    lat: 41.55, 
-    lng: 60.63, 
-    address: "Urganch sh., Al-Xorazmiy ko'chasi",
-    sector: "Urganch-001",
-    deviceId: "ESP-URG-01"
-  },
-  { 
-    id: 2, 
-    name: "Xiva Ichan-Qal'a", 
-    lat: 41.3789, 
-    lng: 60.3639, 
-    address: "Xiva sh., Ichan-Qal'a muzeyi",
-    sector: "Xiva-002",
-    deviceId: "ESP-XIV-02"
-  },
-  { 
-    id: 3, 
-    name: "Qo'shko'pir Agro-Node", 
-    lat: 41.5333, 
-    lng: 60.35, 
-    address: "Qo'shko'pir tumani, Paxta zavodi",
-    sector: "Qoshkopir-003",
-    deviceId: "ESP-QOS-03"
-  },
-  { 
-    id: 4, 
-    name: "Bog'ot Power-Grid", 
-    lat: 41.35, 
-    lng: 60.8167, 
-    address: "Bog'ot tumani, Elektr stansiyasi",
-    sector: "Bogot-004",
-    deviceId: "ESP-BOG-04"
-  },
-  { 
-    id: 5, 
-    name: "Xonqa Desert-Relay", 
-    lat: 41.4667, 
-    lng: 60.7833, 
-    address: "Xonqa tumani, Aloqa minorasi",
-    sector: "Xonqa-005",
-    deviceId: "ESP-XON-05"
-  },
-  { 
-    id: 6, 
-    name: "Hazorasp Water-Node", 
-    lat: 41.3167, 
-    lng: 61.0667, 
-    address: "Hazorasp tumani, Nasos stansiyasi",
-    sector: "Hazorasp-006",
-    deviceId: "ESP-HAZ-06"
-  },
-  { 
-    id: 7, 
-    name: "Shovot Agro-Terminal", 
-    lat: 41.65, 
-    lng: 60.9833, 
-    address: "Shovot tumani, Logistika markazi",
-    sector: "Shovot-007",
-    deviceId: "ESP-SHO-07"
-  }
-];
+
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {
@@ -119,7 +54,6 @@ async function extractCoordinatesFromGoogleMapsUrl(url) {
     
     const finalUrl = response.url || url;
     console.log("Yakuniy URL:", finalUrl);
-
 
     // Format 1: @41.311081,69.240562,15z
     const atRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
@@ -173,7 +107,7 @@ async function extractCoordinatesFromGoogleMapsUrl(url) {
   }
 }
 
-export default function XorazmSignalMapper() {
+export default function QoraqalpoqContact() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
@@ -193,11 +127,10 @@ export default function XorazmSignalMapper() {
   const [searchError, setSearchError] = useState('');
 
   const [savedLocations, setSavedLocations] = useState(() => {
-    const saved = localStorage.getItem('xorazmLocations');
+    const saved = localStorage.getItem('qoraqalpoqLocations');
     if (saved) return JSON.parse(saved);
     
-    // Agar localStorage bo'sh bo'lsa, Xorazm qurilmalarini default qilib qo'yish
-    return xorazmSectors.map(device => ({
+    return qoraqalpoqDevices.map(device => ({
       id: `LOC-${device.id}`,
       name: device.name,
       lat: device.lat,
@@ -210,7 +143,7 @@ export default function XorazmSignalMapper() {
   });
 
   const [linkedNode, setLinkedNode] = useState(() => {
-    const saved = localStorage.getItem('xorazmLinkedNode');
+    const saved = localStorage.getItem('qoraqalpoqLinkedNode');
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -228,22 +161,21 @@ export default function XorazmSignalMapper() {
   const audioBufferRef = useRef(null);
   const audioSourceRef = useRef(null);
 
-  // 🗺 XARITANI YUKLASH
+  // 🗺️ XARITANI YUKLASH
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
-    // Xorazm markazi
-    const center = [41.55, 60.63];
+    // Qoraqalpog'iston markazi
+    const center = [42.5, 60.0];
     
     // Xarita yaratish
-    const map = L.map(mapRef.current).setView(center, 9);
+    const map = L.map(mapRef.current).setView(center, 8);
     
     // 1-QATLAM: SUN'IY YO'LDOSH (ESRI World Imagery)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Tiles &copy; Esri',
       maxZoom: 19,
     }).addTo(map);
-
 
     // 2-QATLAM: YO'LLAR VA NOMLAR - OQ RANGDA, ANIQ KO'RINADI
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
@@ -345,9 +277,8 @@ export default function XorazmSignalMapper() {
       </div>
     `).openPopup();
 
-    map.setView([searchResult.lat, searchResult.lng], 14);
+    map.setView([searchResult.lat, searchResult.lng], 12);
   }, [searchResult]);
-
 
   // Ringtone ovozini yaratish
   const createRingtoneSound = useCallback(() => {
@@ -423,7 +354,7 @@ export default function XorazmSignalMapper() {
     };
     
     audioSourceRef.current.start();
-    console.log("📱 Rington: YANGI QURILMA SO'ROVI KELDI - XORAZM");
+    console.log("📱 Rington: YANGI QURILMA SO'ROVI KELDI - QORAQALPOG'ISTON");
   }, [createRingtoneSound]);
 
   // Barcha ovozlarni to'xtatish
@@ -438,7 +369,7 @@ export default function XorazmSignalMapper() {
 
   // LocalStorage-ga saqlash
   useEffect(() => {
-    localStorage.setItem('xorazmLocations', JSON.stringify(savedLocations));
+    localStorage.setItem('qoraqalpoqLocations', JSON.stringify(savedLocations));
   }, [savedLocations]);
 
   // Vaqtni yangilash
@@ -447,17 +378,15 @@ export default function XorazmSignalMapper() {
     return () => clearInterval(timer);
   }, []);
 
-  // ✅ TUZATILGAN: WebSocket ulanish - Namangan va Navoiy bilan bir xil
+  // WebSocket ulanish - XORAZM BILAN BIR XIL
   useEffect(() => {
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       socketRef.current = new WebSocket(`${protocol}//${window.location.hostname}:80`);
       
       socketRef.current.onopen = () => {
-        console.log("✅ WebSocket ulandi - XORAZM");
-        socketRef.current.send(JSON.stringify({ type: 'frontend' }));
+        console.log("✅ WebSocket ulandi - QORAQALPOG'ISTON");
       };
-
 
       socketRef.current.onmessage = (event) => {
         try {
@@ -493,18 +422,14 @@ export default function XorazmSignalMapper() {
             
             if (data.device) {
               setEspDevices(prev => {
-                // Agar qurilma allaqachon mavjud bo'lmasa qo'shish
                 if (!prev.some(d => d.id === data.device.id)) {
-                  console.log("➕ Yangi qurilma qo'shilmoqda:", data.device);
                   return [...prev, data.device];
                 }
                 return prev;
               });
             }
           }
-        } catch (e) {
-          console.error("WebSocket xatoni qayta ishlashda xato:", e);
-        }
+        } catch (e) {}
       };
 
       socketRef.current.onerror = (error) => {
@@ -516,7 +441,7 @@ export default function XorazmSignalMapper() {
       };
 
     } catch (e) {
-      console.log("WebSocket ulanishda xato:", e);
+      console.log("WebSocket ulanishda xato (bu normal):", e);
     }
 
     return () => {
@@ -525,7 +450,7 @@ export default function XorazmSignalMapper() {
       }
       stopAllSounds();
     };
-  }, [playRingtoneSound, stopAllSounds]); // espDevices ni dependency ga qo'shilmadi!
+  }, [playRingtoneSound, stopAllSounds]);
 
   // ✅ QURILMA ID UNIQUE EKANLIGINI TEKSHIRISH
   const isDeviceIdUnique = (deviceId, currentLocationId = null) => {
@@ -554,7 +479,6 @@ export default function XorazmSignalMapper() {
       setDeviceIdError('');
     }
   };
-
 
   // 🔍 QIDIRUV FUNKSIYASI
   const handleSearchByLink = async () => {
@@ -607,7 +531,7 @@ export default function XorazmSignalMapper() {
       else {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            address + " Xorazm"
+            address + " Qoraqalpog'iston"
           )}&limit=5`
         );
         const data = await response.json();
@@ -648,7 +572,6 @@ export default function XorazmSignalMapper() {
     setSearchResult(null);
     setSearchLink('');
     
-    // Qidiruv markerini o'chirish
     if (searchMarkerRef.current) {
       searchMarkerRef.current.remove();
       searchMarkerRef.current = null;
@@ -680,7 +603,7 @@ export default function XorazmSignalMapper() {
     setShowAddModal(true);
     
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.setView([location.lat, location.lng], 14);
+      mapInstanceRef.current.setView([location.lat, location.lng], 12);
     }
   };
 
@@ -691,7 +614,6 @@ export default function XorazmSignalMapper() {
     setShowAddModal(true);
     setDeviceIdError('');
     setFormData((prev) => ({ ...prev, name: "Yuklanmoqda...", deviceId: '' }));
-
 
     try {
       const response = await fetch(
@@ -793,7 +715,7 @@ export default function XorazmSignalMapper() {
     return location.name || "Noma'lum manzil";
   };
 
-  // ✅ TUZATILGAN: Bog'lanish o'rnatish - Navoiy bilan bir xil
+  // ✅ TUZATILGAN: Bog'lanish o'rnatish
   const handleEstablishLink = (location) => {
     const device = espDevices.find(d => d.id === location.deviceId);
     
@@ -814,14 +736,14 @@ export default function XorazmSignalMapper() {
         deviceId: device.id 
       };
       setLinkedNode(newNode);
-      localStorage.setItem('xorazmLinkedNode', JSON.stringify(newNode));
+      localStorage.setItem('qoraqalpoqLinkedNode', JSON.stringify(newNode));
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.setView([location.lat, location.lng], 14);
+        mapInstanceRef.current.setView([location.lat, location.lng], 12);
       }
     }
   };
 
-  // ✅ TUZATILGAN: Bog'lanishni uzish - Navoiy bilan bir xil
+  // ✅ TUZATILGAN: Bog'lanishni uzish
   const handleStopAndDisconnect = () => {
     stopAudio();
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -829,10 +751,9 @@ export default function XorazmSignalMapper() {
     }
     setIsVoiceActive(false);
     setLinkedNode(null);
-    localStorage.removeItem('xorazmLinkedNode');
+    localStorage.removeItem('qoraqalpoqLinkedNode');
     stopAllSounds();
   };
-
 
   // Ovozli aloqa boshlash
   const startAudio = async () => {
@@ -946,15 +867,14 @@ export default function XorazmSignalMapper() {
   return (
     <div className="flex h-screen bg-black text-white font-sans overflow-hidden relative">
       
-      {/* 🗺 XARITA QISMI */}
+      {/* 🗺️ XARITA QISMI */}
       <div className="w-[70%] h-full flex flex-col relative border-r border-emerald-500/20">
         {/* NAVBAR */}
         <div className="p-4 bg-gray-900/90 backdrop-blur-md border-b border-emerald-500/20 z-[1000]">
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-xl font-black text-emerald-400 uppercase italic tracking-tighter flex items-center gap-2 whitespace-nowrap">
-              <Map className="w-5 h-5" /> Xorazm Signal Mapper
+              <Map className="w-5 h-5" /> Qoraqalpog'iston Signal Mapper
             </h1>
-
 
             {/* QIDIRUV MAYDONI */}
             <div className="flex-1 max-w-2xl">
@@ -1042,7 +962,6 @@ export default function XorazmSignalMapper() {
         />
       </div>
 
-
       {/* O'NG PANEL */}
       <div className="w-[30%] bg-[#080d0b] p-6 flex flex-col gap-6 overflow-y-auto">
         
@@ -1088,7 +1007,6 @@ export default function XorazmSignalMapper() {
                     <Trash2 size={16} />
                   </button>
 
-
                   <div 
                     className="mb-4 pr-6 cursor-pointer hover:bg-emerald-500/5 p-2 rounded-xl transition-all"
                     onClick={() => handleMarkerClick(loc)}
@@ -1099,7 +1017,7 @@ export default function XorazmSignalMapper() {
                     <p className="text-[10px] text-emerald-200/60 font-mono italic truncate">
                       <span className="text-emerald-400">Qurilma:</span> {loc.sector || "Noma'lum"} 
                       {loc.deviceId && ` | ID: ${loc.deviceId}`}
-                      {device && ` | Status: ${device ? device.status : 'Noma\'lum'}`}
+                      {device && ` | Status: ${device.status}`}
                     </p>
                     <p className="text-[7px] text-gray-600 mt-1">
                       {loc.lat.toFixed(6)}, {loc.lng.toFixed(6)}
@@ -1167,7 +1085,6 @@ export default function XorazmSignalMapper() {
                       </button>
                     </div>
                   )}
-
                 </div>
               );
             })
@@ -1175,7 +1092,7 @@ export default function XorazmSignalMapper() {
         </div>
       </div>
 
-      {/* 3. YANGI MANZIL QO'SHISH MODALI - NAVOIY VERSIYASI (SODDALASHTIRILGAN) */}
+      {/* 3. YANGI MANZIL QO'SHISH MODALI - XORAZM BILAN BIR XIL */}
       {showAddModal && (
         <div className="absolute inset-0 z-[3000] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
           <form onSubmit={saveNewLocation} className="bg-[#0c1410] border border-emerald-500/40 p-8 rounded-[32px] w-full max-w-md shadow-2xl scale-in">
@@ -1218,7 +1135,7 @@ export default function XorazmSignalMapper() {
                   className="w-full bg-black/40 border border-emerald-500/20 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all"
                   value={formData.sector}
                   onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
-                  placeholder="Masalan: Xorazm-001"
+                  placeholder="Masalan: Nukus-001"
                 />
                 <p className="text-[7px] text-emerald-500/40 mt-1 ml-2">Bu nom xaritadagi marker tepasida chiqadi</p>
               </div>
@@ -1229,7 +1146,7 @@ export default function XorazmSignalMapper() {
                   className={`w-full bg-black/40 border ${deviceIdError ? 'border-red-500' : 'border-emerald-500/20'} rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all`}
                   value={formData.deviceId}
                   onChange={handleDeviceIdChange}
-                  placeholder="Masalan: ESP32-001 yoki Xiva-01"
+                  placeholder="Masalan: ESP32-001 yoki NK-01"
                 />
                 {deviceIdError ? (
                   <p className="text-[8px] text-red-500 mt-1 ml-2 font-bold">{deviceIdError}</p>
@@ -1238,7 +1155,6 @@ export default function XorazmSignalMapper() {
                 )}
               </div>
             </div>
-
 
             <div className="flex gap-3 mt-8">
               <button type="button" onClick={() => {
@@ -1309,7 +1225,6 @@ export default function XorazmSignalMapper() {
                 ))
               ) : (
                 <div className="col-span-full flex flex-col items-center justify-center text-gray-600 italic py-20">
-
                   <p>Arxiv bo'sh. Hali hech qanday suhbat yozib olinmagan.</p>
                 </div>
               )}
