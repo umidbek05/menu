@@ -414,4 +414,4 @@ export default function AndijanContact() {
             `}</style>
         </div>
     );
-};
+}

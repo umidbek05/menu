@@ -905,4 +905,4 @@ export default function FerganaContact() {
             `}</style>
         </div>
     );
-};
+}
