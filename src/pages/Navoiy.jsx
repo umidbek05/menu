@@ -1258,4 +1258,4 @@ export default function NavoiySignalMapper() {
       `}</style>
     </div>
   );
-}
+};
