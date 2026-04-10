@@ -902,4 +902,4 @@ export default function QashqadaryoContact() {
             `}</style>
         </div>
     );
-}
+};
