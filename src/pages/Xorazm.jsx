@@ -31,7 +31,8 @@ const greenIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-
+// Xorazm sektorlari ma'lumotlari
+const xorazmSectors = [];  // Bo'sh array - hech qanday default qurilma yo'q
 
 // Google Maps havolasidan koordinatalarni ajratish funksiyasi
 async function extractCoordinatesFromGoogleMapsUrl(url) {
@@ -171,7 +172,7 @@ export default function XorazmSignalMapper() {
     const center = [41.55, 60.63];
     
     // Xarita yaratish
-    const map = L.map(mapRef.current).setView(center, 9);
+    const map = L.map(mapRef.current).setView(center, 10);
     
     // 1-QATLAM: SUN'IY YO'LDOSH (ESRI World Imagery)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -383,84 +384,93 @@ export default function XorazmSignalMapper() {
   }, []);
 
   // ✅ TUZATILGAN: WebSocket ulanish - Namangan va Navoiy bilan bir xil
-  useEffect(() => {
-    try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      socketRef.current = new WebSocket(`${protocol}//${window.location.hostname}:80`);
-      
-      socketRef.current.onopen = () => {
-        console.log("✅ WebSocket ulandi - XORAZM");
-        socketRef.current.send(JSON.stringify({ type: 'frontend' }));
-      };
-
-
-      socketRef.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("📩 WebSocket xabar keldi:", data);
-          
-          if (data.type === 'list') {
-            // MUHIM: functional update ishlatish
-            setEspDevices(prevDevices => {
-              const oldDevices = prevDevices;
-              const newDevicesList = data.devices || [];
-              
-              console.log("📱 Eski qurilmalar:", oldDevices);
-              console.log("📱 Yangi qurilmalar:", newDevicesList);
-              
-              // Yangi qurilmalarni aniqlash
-              const newDevices = newDevicesList.filter(
-                (newDev) => !oldDevices.some(oldDev => oldDev.id === newDev.id)
-              );
-              
-              // Yangi pending qurilmalar bo'lsa rington chalish
-              if (newDevices.some((dev) => dev.status === 'pending')) {
-                console.log("🔔 Yangi pending qurilma topildi, rington chalinmoqda");
-                playRingtoneSound();
-              }
-              
-              return newDevicesList;
-            });
-            
-          } else if (data.type === 'new_pending_device') {
-            console.log("🆕 Yangi pending qurilma:", data.device);
-            playRingtoneSound();
-            
-            if (data.device) {
-              setEspDevices(prev => {
-                // Agar qurilma allaqachon mavjud bo'lmasa qo'shish
-                if (!prev.some(d => d.id === data.device.id)) {
-                  console.log("➕ Yangi qurilma qo'shilmoqda:", data.device);
-                  return [...prev, data.device];
-                }
-                return prev;
-              });
-            }
-          }
-        } catch (e) {
-          console.error("WebSocket xatoni qayta ishlashda xato:", e);
-        }
-      };
-
-      socketRef.current.onerror = (error) => {
-        console.error("❌ WebSocket xatosi:", error);
-      };
-
-      socketRef.current.onclose = () => {
-        console.log("🔌 WebSocket uzildi");
-      };
-
-    } catch (e) {
-      console.log("WebSocket ulanishda xato:", e);
-    }
-
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-      stopAllSounds();
+  // WebSocket ulanish - Railway URL bilan
+useEffect(() => {
+  try {
+    // Railway URL
+    const WS_URL = 'wss://serversos-production.up.railway.app';
+    
+    socketRef.current = new WebSocket(WS_URL);
+    
+    socketRef.current.onopen = () => {
+      console.log("✅ WebSocket ulandi - XORAZM (Railway)");
+      socketRef.current.send(JSON.stringify({ type: 'frontend' }));
     };
-  }, [playRingtoneSound, stopAllSounds]); // espDevices ni dependency ga qo'shilmadi!
+
+    socketRef.current.onmessage = (event) => {
+      try {
+        // Audio ma'lumot (binary)
+        if (event.data instanceof Blob) {
+          console.log("🎤 Audio ma'lumot keldi, o'lcham:", event.data.size);
+          
+          // Audio ni ijro etish uchun
+          const audioUrl = URL.createObjectURL(event.data);
+          const audio = new Audio(audioUrl);
+          audio.play().catch(e => console.log("Audio ijro etishda xato:", e));
+          
+          return;
+        }
+        
+        // JSON xabar
+        const data = JSON.parse(event.data);
+        console.log("📩 WebSocket xabar keldi:", data);
+        
+        if (data.type === 'list') {
+          setEspDevices(prevDevices => {
+            const newDevicesList = data.devices || [];
+            
+            // Yangi pending qurilmalar bo'lsa rington chalish
+            const hasNewPending = newDevicesList.some(
+              newDev => !prevDevices.some(oldDev => oldDev.id === newDev.id) && newDev.status === 'pending'
+            );
+            
+            if (hasNewPending) {
+              console.log("🔔 Yangi pending qurilma topildi");
+              playRingtoneSound();
+            }
+            
+            return newDevicesList;
+          });
+        } else if (data.type === 'new_pending_device') {
+          console.log("🆕 Yangi pending qurilma:", data.device);
+          playRingtoneSound();
+          
+          if (data.device) {
+            setEspDevices(prev => {
+              if (!prev.some(d => d.id === data.device.id)) {
+                return [...prev, data.device];
+              }
+              return prev;
+            });
+          }
+        }
+      } catch (e) {
+        console.error("WebSocket xatoni qayta ishlashda xato:", e);
+      }
+    };
+
+    socketRef.current.onerror = (error) => {
+      console.error("❌ WebSocket xatosi:", error);
+    };
+
+ // ✅ QO'L REJIMI - SAHIFA AVTOMATIK YANGILANMAYDI
+    socketRef.current.onclose = () => {
+      console.log("🔌 WebSocket uzildi - qayta ulanish faqat qo'lda");
+      // Hech narsa qilma, sahifa yangilanmaydi
+    };
+
+  } catch (e) {
+    console.log("WebSocket ulanishda xato:", e);
+  }
+
+  return () => {
+    if (socketRef.current) {
+      socketRef.current.close();
+    }
+    stopAllSounds();
+  };
+}, [playRingtoneSound, stopAllSounds]);
+// espDevices ni dependency ga qo'shilmadi!
 
   // ✅ QURILMA ID UNIQUE EKANLIGINI TEKSHIRISH
   const isDeviceIdUnique = (deviceId, currentLocationId = null) => {
